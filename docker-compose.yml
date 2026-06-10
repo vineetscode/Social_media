@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Primary Database
+  db:
+    image: postgres:15-alpine
+    container_name: jabwemet_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: jabwemet
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - jabwemet_net
+
+  # Next.js Modular Monolith App
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: postgresql://postgres:password123@db:5432/jabwemet?schema=public
+    container_name: jabwemet_app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:password123@db:5432/jabwemet?schema=public
+      - NODE_ENV=production
+      - JWT_SECRET=super_secure_jwt_secret_change_me_in_prod
+      - CLOUDINARY_URL=cloudinary://key:secret@cloudname
+      - NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=cloudname
+    depends_on:
+      - db
+    networks:
+      - jabwemet_net
+
+  # FUTURE REDIS PHASE (Uncomment when moving to Stage 3 / 10k+ users)
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: jabwemet_redis
+  #   restart: always
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redisdata:/data
+  #   networks:
+  #     - jabwemet_net
+
+volumes:
+  pgdata:
+    driver: local
+  # redisdata:
+  #   driver: local
+
+networks:
+  jabwemet_net:
+    driver: bridge

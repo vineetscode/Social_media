@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+/* =============================================
+   BASE BODY
+   ============================================= */
+body {
+  font-family: var(--font-sans), "Outfit", "Inter", sans-serif;
+  background-color: #0d0f14;
+  color: #f1f3f9;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* =============================================
+   PREMIUM GLASSMORPHISM
+   ============================================= */
+.glass-panel {
+  background: rgba(19, 22, 29, 0.7);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: border-color 0.25s ease, background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+.glass-sidebar {
+  background: rgba(13, 15, 20, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.glass-dock {
+  background: rgba(19, 22, 29, 0.92);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 -2px 40px rgba(0, 0, 0, 0.5), 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* =============================================
+   NAVIGATION ACTIVE ITEM
+   ============================================= */
+.nav-item-active {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.1));
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  color: #818cf8;
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.1);
+}
+
+.nav-item-active svg {
+  color: #6366f1;
+  filter: drop-shadow(0 0 6px rgba(99, 102, 241, 0.5));
+}
+
+/* =============================================
+   CUSTOM SCROLLBAR
+   ============================================= */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.2);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.45);
+}
+
+/* =============================================
+   DOUBLE-TAP HEART ANIMATION
+   ============================================= */
+@keyframes heart-pop {
+  0% {
+    transform: scale(0) rotate(-10deg);
+    opacity: 0;
+  }
+  15% {
+    transform: scale(1.3) rotate(15deg);
+    opacity: 1;
+  }
+  35% {
+    transform: scale(1) rotate(-5deg);
+    opacity: 1;
+  }
+  80% {
+    transform: scale(0.95) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.5) rotate(5deg);
+    opacity: 0;
+  }
+}
+
+.animate-heart-pop {
+  animation: heart-pop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* =============================================
+   BORDER GLOW PULSE
+   ============================================= */
+@keyframes border-flow {
+  0%, 100% {
+    border-color: rgba(99, 102, 241, 0.12);
+    box-shadow: none;
+  }
+  50% {
+    border-color: rgba(139, 92, 246, 0.35);
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.08);
+  }
+}
+
+.animate-border-flow {
+  animation: border-flow 5s infinite ease-in-out;
+}
+
+/* =============================================
+   TYPING BUBBLE ANIMATION
+   ============================================= */
+@keyframes typing-bounce {
+  0%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  width: 5px;
+  height: 5px;
+  background-color: #6366f1;
+  border-radius: 50%;
+  display: inline-block;
+  animation: typing-bounce 1.1s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.typing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+/* =============================================
+   MOBILE DRAWER OVERLAY
+   ============================================= */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 60;
+}
+
+/* =============================================
+   GLOW INPUT FOCUS
+   ============================================= */
+input:focus, textarea:focus {
+  outline: none;
+}
+
+.input-glow:focus {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.08), inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+/* =============================================
+   CARD GRADIENT OVERLAYS
+   ============================================= */
+.gradient-mesh {
+  background-image:
+    radial-gradient(at 20% 20%, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+    radial-gradient(at 80% 80%, rgba(16, 185, 129, 0.04) 0%, transparent 60%);
+}
+
+/* =============================================
+   STITCH-STYLE FLOATING SECTION TITLE
+   ============================================= */
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+/* =============================================
+   STORIES RING GRADIENT (Profile bubble border)
+   ============================================= */
+.story-ring {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+  padding: 2px;
+  border-radius: 9999px;
+}
+
+/* =============================================
+   GRADIENT TEXT UTILITY
+   ============================================= */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* =============================================
+   SCROLL SNAP UTILITIES
+   ============================================= */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* =============================================
+   LOADING SHIMMER
+   ============================================= */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer {
+  background: linear-gradient(90deg,
+    rgba(255,255,255,0.03) 0%,
+    rgba(255,255,255,0.08) 50%,
+    rgba(255,255,255,0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite ease-in-out;
+}

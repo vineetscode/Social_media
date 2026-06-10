@@ -1,0 +1,383 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useUser, UserButton } from "@clerk/nextjs";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Home,
+  MessageSquare,
+  Compass,
+  Bell,
+  Search,
+  Film,
+  Shield,
+  X,
+  Menu,
+  Zap,
+  ChevronRight,
+} from "lucide-react";
+
+interface UserMe {
+  id: string;
+  role: "USER" | "MODERATOR" | "ADMIN";
+  profile?: {
+    username: string;
+    displayName: string;
+    avatarUrl?: string;
+    isVerified?: boolean;
+  };
+}
+
+const NAV_LINKS = [
+  { href: "/feed",          icon: Home,         label: "Feed" },
+  { href: "/explore",       icon: Compass,      label: "Explore" },
+  { href: "/reels",         icon: Film,         label: "Reels" },
+  { href: "/search",        icon: Search,       label: "Search" },
+  { href: "/chat",          icon: MessageSquare,label: "Messages" },
+  { href: "/notifications", icon: Bell,         label: "Notifications" },
+];
+
+const DOCK_LINKS = [
+  { href: "/feed",          icon: Home,         label: "Home" },
+  { href: "/explore",       icon: Compass,      label: "Explore" },
+  { href: "/reels",         icon: Film,         label: "Reels" },
+  { href: "/search",        icon: Search,       label: "Search" },
+  { href: "/notifications", icon: Bell,         label: "Activity" },
+  { href: "/chat",          icon: MessageSquare,label: "Chat" },
+];
+
+export default function NavigationShell({
+  children,
+  fullBleed = false,
+}: {
+  children: React.ReactNode;
+  fullBleed?: boolean;
+}) {
+  const { user, isLoaded } = useUser();
+  const pathname = usePathname();
+  const [userMe, setUserMe] = useState<UserMe | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  const fetchUserMe = useCallback(async () => {
+    try {
+      const res = await fetch("/api/users/me");
+      if (res.ok) {
+        const data = await res.json();
+        setUserMe(data);
+      }
+    } catch (_) {}
+  }, []);
+
+  useEffect(() => {
+    if (isLoaded && user) {
+      fetchUserMe();
+    }
+  }, [isLoaded, user, fetchUserMe]);
+
+  // Close drawer when navigating
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  const isAdmin =
+    userMe?.role === "ADMIN" || userMe?.role === "MODERATOR";
+
+  const isActive = (href: string) => pathname === href;
+
+  return (
+    <div className="min-h-screen bg-background text-text-primary flex overflow-x-hidden gradient-mesh">
+      {/* ─────────────────────────────────────────
+          AMBIENT BACKGROUND GLOWS
+      ───────────────────────────────────────── */}
+      <div
+        className="fixed top-[-15%] left-[-10%] w-[55%] h-[55%] rounded-full pointer-events-none z-0"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(99,102,241,0.07) 0%, transparent 70%)",
+        }}
+      />
+      <div
+        className="fixed bottom-[-15%] right-[-10%] w-[50%] h-[50%] rounded-full pointer-events-none z-0"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(16,185,129,0.04) 0%, transparent 70%)",
+        }}
+      />
+
+      {/* ─────────────────────────────────────────
+          DESKTOP / TABLET SIDEBAR
+      ───────────────────────────────────────── */}
+      <aside className="hidden md:flex flex-col glass-sidebar h-screen sticky top-0 z-40 flex-shrink-0 transition-all duration-300 w-[70px] lg:w-[240px]">
+        {/* Logo */}
+        <div className="px-4 lg:px-6 pt-6 pb-4">
+          <Link
+            href="/"
+            className="flex items-center gap-3 group"
+          >
+            {/* Logo icon */}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-neon flex items-center justify-center flex-shrink-0 shadow-glow-sm group-hover:shadow-glow-primary transition-shadow duration-300">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <span className="hidden lg:block text-lg font-black gradient-text truncate tracking-tight">
+              JabWeMet
+            </span>
+          </Link>
+        </div>
+
+        {/* Navigation Links */}
+        <nav className="flex-1 px-3 lg:px-4 space-y-1 overflow-y-auto scrollbar-none py-2" aria-label="Sidebar navigation">
+          {NAV_LINKS.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 group relative ${
+                  active
+                    ? "nav-item-active"
+                    : "text-text-muted hover:text-text-primary hover:bg-white/5"
+                }`}
+              >
+                <Icon
+                  className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                    active ? "text-primary" : ""
+                  }`}
+                />
+                <span className="hidden lg:block truncate">{label}</span>
+                {active && (
+                  <motion.div
+                    layoutId="sidebar-active-pill"
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary rounded-r-full"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+
+          {/* Admin link - shown only to admins/moderators */}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              aria-current={isActive("/admin") ? "page" : undefined}
+              className={`flex items-center justify-center lg:justify-start gap-3.5 px-3 py-3 rounded-2xl text-sm font-semibold transition-all duration-200 group relative ${
+                isActive("/admin")
+                  ? "nav-item-active"
+                  : "text-red-400/60 hover:text-red-400 hover:bg-red-500/5"
+              }`}
+            >
+              <Shield
+                className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                  isActive("/admin") ? "text-red-400" : ""
+                }`}
+              />
+              <span className="hidden lg:block truncate">Moderation</span>
+            </Link>
+          )}
+        </nav>
+
+        {/* User Profile Bar */}
+        <div className="px-3 lg:px-4 py-4">
+          <div className="flex items-center justify-center lg:justify-start gap-3 p-2.5 rounded-2xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors duration-200">
+            <div className="flex-shrink-0">
+              <UserButton afterSignOutUrl="/" />
+            </div>
+            <div className="hidden lg:block overflow-hidden">
+              <p className="text-xs font-bold text-text-primary truncate leading-tight">
+                {user?.fullName || "—"}
+              </p>
+              <p className="text-[10px] text-text-muted truncate">
+                @{user?.username || "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* ─────────────────────────────────────────
+          MOBILE TOP HEADER
+      ───────────────────────────────────────── */}
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 glass-panel border-b border-white/5 py-3.5 px-5 flex justify-between items-center">
+        {/* Hamburger / Menu button — opens drawer */}
+        <button
+          onClick={() => setDrawerOpen(true)}
+          className="flex items-center gap-2.5 group"
+          aria-label="Open navigation menu"
+          aria-expanded={drawerOpen}
+          aria-haspopup="dialog"
+        >
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-neon flex items-center justify-center shadow-glow-sm">
+            <Zap className="w-4 h-4 text-white" />
+          </div>
+          <span className="text-base font-black gradient-text tracking-tight">
+            JabWeMet
+          </span>
+        </button>
+
+        {/* Right side — user button */}
+        <div className="flex items-center gap-3">
+          <UserButton afterSignOutUrl="/" />
+        </div>
+      </header>
+
+      {/* ─────────────────────────────────────────
+          MOBILE SLIDE-OUT DRAWER
+      ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {drawerOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25 }}
+              className="drawer-overlay md:hidden"
+              onClick={() => setDrawerOpen(false)}
+            />
+
+            {/* Drawer panel */}
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 35 }}
+              className="fixed top-0 left-0 bottom-0 w-[280px] glass-sidebar z-[70] flex flex-col md:hidden shadow-float"
+            >
+              {/* Drawer Header */}
+              <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary to-primary-neon flex items-center justify-center">
+                    <Zap className="w-4 h-4 text-white" />
+                  </div>
+                  <span className="text-lg font-black gradient-text tracking-tight">
+                    JabWeMet
+                  </span>
+                </div>
+                <button
+                  onClick={() => setDrawerOpen(false)}
+                  className="p-2 rounded-xl hover:bg-white/5 text-text-muted hover:text-white transition-colors"
+                  aria-label="Close navigation menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* User profile card */}
+              <div className="px-5 py-4 border-b border-white/5">
+                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/4 border border-white/5">
+                  <UserButton afterSignOutUrl="/" />
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-bold text-white truncate">
+                      {user?.fullName || "—"}
+                    </p>
+                    <p className="text-[10px] text-text-muted truncate">
+                      @{user?.username || "—"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Drawer Navigation Links */}
+              <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto scrollbar-none" aria-label="Drawer navigation">
+                <p className="section-label px-3 mb-3">Navigation</p>
+                {NAV_LINKS.map(({ href, icon: Icon, label }) => {
+                  const active = isActive(href);
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200 group ${
+                        active
+                          ? "nav-item-active"
+                          : "text-text-muted hover:text-text-primary hover:bg-white/5"
+                      }`}
+                    >
+                      <Icon
+                        className={`w-5 h-5 flex-shrink-0 ${active ? "text-primary" : ""}`}
+                      />
+                      <span className="flex-1">{label}</span>
+                      {active && (
+                        <ChevronRight className="w-4 h-4 text-primary/60" />
+                      )}
+                    </Link>
+                  );
+                })}
+
+                {isAdmin && (
+                  <>
+                    <p className="section-label px-3 pt-4 pb-2">Moderation</p>
+                    <Link
+                      href="/admin"
+                      aria-current={isActive("/admin") ? "page" : undefined}
+                      className={`flex items-center gap-4 px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all ${
+                        isActive("/admin")
+                          ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                          : "text-red-400/60 hover:text-red-400 hover:bg-red-500/5"
+                      }`}
+                    >
+                      <Shield className="w-5 h-5 flex-shrink-0" />
+                      <span>Moderation Panel</span>
+                    </Link>
+                  </>
+                )}
+              </nav>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ─────────────────────────────────────────
+          MAIN CONTENT AREA
+      ───────────────────────────────────────── */}
+      <main
+        className={`flex-1 min-h-screen relative z-10 ${
+          fullBleed
+            ? "pt-[57px] md:pt-0"
+            : "pt-[57px] md:pt-0 pb-24 md:pb-0"
+        }`}
+      >
+        {children}
+      </main>
+
+      {/* ─────────────────────────────────────────
+          MOBILE FLOATING BOTTOM DOCK
+      ───────────────────────────────────────── */}
+      {!fullBleed && (
+        <nav className="md:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-3 py-2.5 rounded-[26px] glass-dock" aria-label="Mobile dock navigation">
+          {DOCK_LINKS.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className="relative flex flex-col items-center justify-center w-12 h-12 rounded-[18px] transition-all duration-200 group"
+                aria-label={label}
+              >
+                {active && (
+                  <motion.div
+                    layoutId="dock-active-bg"
+                    className="absolute inset-0 rounded-[18px] bg-primary/15 border border-primary/25"
+                    transition={{ type: "spring", stiffness: 350, damping: 30 }}
+                  />
+                )}
+                <Icon
+                  className={`w-5 h-5 relative z-10 transition-all duration-200 ${
+                    active
+                      ? "text-primary scale-110 drop-shadow-[0_0_6px_rgba(99,102,241,0.6)]"
+                      : "text-text-muted group-hover:text-text-secondary group-hover:scale-105"
+                  }`}
+                />
+              </Link>
+            );
+          })}
+        </nav>
+      )}
+    </div>
+  );
+}

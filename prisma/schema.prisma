@@ -1,0 +1,366 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  CREATOR
+  MODERATOR
+  ADMIN
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+  MESSAGE
+  MENTION
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id                    String         @id @default(cuid())
+  email                 String         @unique
+  passwordHash          String?        // Nullable for Google OAuth users
+  role                  Role           @default(USER)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  // Relationships
+  profile               Profile?
+  posts                 Post[]
+  comments              Comment[]
+  likes                 Like[]
+  followers             Follower[]     @relation("following")
+  following             Follower[]     @relation("follower")
+  blocksSent            Block[]        @relation("blocker")
+  blocksReceived        Block[]        @relation("blocked")
+  messagesSent          Message[]      @relation("sender")
+  messagesReceived      Message[]      @relation("recipient")
+  stories               Story[]
+  storyViews            StoryViewer[]
+  reels                 Reel[]
+  notificationsReceived Notification[] @relation("recipient")
+  notificationsSent     Notification[] @relation("sender")
+  reportsFiled          Report[]       @relation("reporter")
+  reportsAgainst        Report[]       @relation("reported")
+  bookmarks             Bookmark[]
+
+  @@index([email])
+}
+
+model Profile {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  username       String   @unique
+  displayName    String
+  bio            String?  @db.Text
+  avatarUrl      String?
+  coverUrl       String?
+  website        String?
+  followerCount  Int      @default(0)
+  followingCount Int      @default(0)
+  isPrivate      Boolean  @default(false)
+  isVerified     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([username])
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  authorId  String
+  caption   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  author    User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media     Media[]
+  comments  Comment[]
+  likes     Like[]
+  bookmarks Bookmark[]
+  hashtags  HashtagOnPost[]
+  reports   Report[]
+
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Media {
+  id        String    @id @default(cuid())
+  postId    String?
+  reelId    String?
+  storyId   String?
+  url       String
+  secureUrl String
+  publicId  String
+  format    String
+  width     Int
+  height    Int
+  duration  Float?    // Null for images, duration in seconds for video
+  type      MediaType
+  createdAt DateTime  @default(now())
+
+  // Relations
+  post  Post?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reel  Reel?  @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  story Story? @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([reelId])
+  @@index([storyId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  postId    String?
+  reelId    String?
+  authorId  String
+  parentId  String?
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  post     Post?     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  reel     Reel?     @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+  likes    Like[]
+  reports  Report[]
+
+  @@index([postId])
+  @@index([reelId])
+  @@index([parentId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String?
+  commentId String?
+  reelId    String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reel    Reel?    @relation(fields: [reelId], references: [id], onDelete: Cascade)
+
+  // Prevent multiple likes per entity by the same user
+  @@unique([userId, postId])
+  @@unique([userId, commentId])
+  @@unique([userId, reelId])
+  @@index([userId])
+}
+
+model Follower {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
+}
+
+model Block {
+  id        String   @id @default(cuid())
+  blockerId String
+  blockedId String
+  createdAt DateTime @default(now())
+
+  // Relations
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+model Message {
+  id          String    @id @default(cuid())
+  senderId    String
+  recipientId String
+  content     String?   @db.Text
+  mediaUrl    String?
+  isRead      Boolean   @default(false)
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  // Relations
+  sender    User @relation("sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, recipientId])
+  @@index([recipientId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Story {
+  id        String   @id @default(cuid())
+  authorId  String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  // Relations
+  author  User          @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media   Media[]
+  viewers StoryViewer[]
+
+  @@index([authorId])
+  @@index([expiresAt])
+}
+
+model StoryViewer {
+  id       String   @id @default(cuid())
+  storyId  String
+  userId   String
+  viewedAt DateTime @default(now())
+
+  // Relations
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, userId])
+  @@index([storyId])
+}
+
+model Reel {
+  id         String   @id @default(cuid())
+  authorId   String
+  caption    String?  @db.Text
+  viewsCount Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  author   User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media    Media[]
+  likes    Like[]
+  comments Comment[]
+  hashtags HashtagOnReel[]
+  reports  Report[]
+
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  senderId    String?
+  type        NotificationType
+  referenceId String?          // Id of related Post, Comment, Reel, Follower, Message, etc.
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  // Relations
+  recipient User  @relation("recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sender    User? @relation("sender", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId])
+  @@index([createdAt(sort: Desc)])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reportedId String?
+  postId     String?
+  commentId  String?
+  reelId     String?
+  reason     String       @db.Text
+  status     ReportStatus @default(PENDING)
+  createdAt  DateTime     @default(now())
+
+  // Relations
+  reporter User     @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User?    @relation("reported", fields: [reportedId], references: [id], onDelete: SetNull)
+  post     Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment  Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  reel     Reel?    @relation(fields: [reelId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([reportedId])
+  @@index([status])
+}
+
+model Hashtag {
+  id        String          @id @default(cuid())
+  tag       String          @unique
+  createdAt DateTime        @default(now())
+  posts     HashtagOnPost[]
+  reels     HashtagOnReel[]
+
+  @@index([tag])
+}
+
+model HashtagOnPost {
+  postId    String
+  hashtagId String
+
+  post    Post    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, hashtagId])
+  @@index([hashtagId])
+}
+
+model HashtagOnReel {
+  reelId    String
+  hashtagId String
+
+  reel    Reel    @relation(fields: [reelId], references: [id], onDelete: Cascade)
+  hashtag Hashtag @relation(fields: [hashtagId], references: [id], onDelete: Cascade)
+
+  @@id([reelId, hashtagId])
+  @@index([hashtagId])
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId])
+}
