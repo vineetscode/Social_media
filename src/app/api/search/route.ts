@@ -47,6 +47,14 @@ export async function GET(request: Request) {
             },
           },
           media: true,
+          likes: {
+            where: {
+              userId: userId,
+            },
+            select: {
+              userId: true,
+            },
+          },
           _count: {
             select: {
               likes: true,
@@ -85,6 +93,14 @@ export async function GET(request: Request) {
               },
             },
             media: true,
+            likes: {
+              where: {
+                userId: userId,
+              },
+              select: {
+                userId: true,
+              },
+            },
             _count: {
               select: {
                 likes: true,

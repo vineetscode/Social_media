@@ -27,31 +27,44 @@ export class ReelService {
   }
 
   // Fetch all reels with creator profiles and media for infinite scroll feed
-  static async getReels(limit = 10) {
-    return prisma.reel.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        author: {
-          select: {
-            profile: {
-              select: {
-                username: true,
-                displayName: true,
-                avatarUrl: true,
-                isVerified: true,
-              },
+  static async getReels(userId?: string, limit = 10) {
+    const includeObj: any = {
+      author: {
+        select: {
+          profile: {
+            select: {
+              username: true,
+              displayName: true,
+              avatarUrl: true,
+              isVerified: true,
             },
           },
         },
-        media: true,
-        _count: {
-          select: {
-            likes: true,
-            comments: true,
-          },
+      },
+      media: true,
+      _count: {
+        select: {
+          likes: true,
+          comments: true,
         },
       },
+    };
+
+    if (userId) {
+      includeObj.likes = {
+        where: {
+          userId,
+        },
+        select: {
+          userId: true,
+        },
+      };
+    }
+
+    return prisma.reel.findMany({
+      take: limit,
+      orderBy: { createdAt: "desc" },
+      include: includeObj,
     });
   }
 
@@ -84,5 +97,30 @@ export class ReelService {
       });
       return { liked: true };
     }
+  }
+
+  // Comment on a reel
+  static async addComment(authorId: string, reelId: string, content: string, parentId?: string) {
+    return prisma.comment.create({
+      data: {
+        authorId,
+        reelId,
+        content,
+        parentId,
+      },
+      include: {
+        author: {
+          select: {
+            profile: {
+              select: {
+                username: true,
+                displayName: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        },
+      },
+    });
   }
 }

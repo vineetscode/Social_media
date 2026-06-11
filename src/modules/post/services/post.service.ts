@@ -1,9 +1,10 @@
 import prisma from "@/lib/prisma";
+import { NotificationService } from "@/modules/notification/services/notification.service";
 
 export class PostService {
   // Create a new post with optional multi-media files
   static async createPost(authorId: string, caption: string | undefined, mediaFiles: { url: string; secureUrl: string; publicId: string; format: string; width: number; height: number; type: "IMAGE" | "VIDEO" }[]) {
-    return prisma.post.create({
+    const post = await prisma.post.create({
       data: {
         authorId,
         caption,
@@ -25,6 +26,28 @@ export class PostService {
         media: true,
       },
     });
+
+    // Notify all followers of authorId
+    try {
+      const followers = await prisma.follower.findMany({
+        where: { followingId: authorId },
+        select: { followerId: true },
+      });
+
+      if (followers.length > 0) {
+        await Promise.all(
+          followers.map((f) =>
+            NotificationService.createNotification(f.followerId, authorId, "POST", post.id).catch((err) =>
+              console.error(`[Post Notification Error] for follower ${f.followerId}:`, err)
+            )
+          )
+        );
+      }
+    } catch (err) {
+      console.error("[Post Notification Query Error]", err);
+    }
+
+    return post;
   }
 
   // Delete a post

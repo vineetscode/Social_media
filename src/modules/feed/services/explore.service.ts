@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma";
 
 export class ExploreService {
   // Fetch global trending posts ranked by gravity engagement score
-  static async getGlobalTrendingFeed(limit = 20) {
+  static async getGlobalTrendingFeed(userId: string, limit = 20) {
     const posts = await prisma.post.findMany({
       take: 100, // Fetch top 100 candidate posts for ranking
       orderBy: { createdAt: "desc" },
@@ -20,6 +20,14 @@ export class ExploreService {
           },
         },
         media: true,
+        likes: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            userId: true,
+          },
+        },
         _count: {
           select: {
             likes: true,

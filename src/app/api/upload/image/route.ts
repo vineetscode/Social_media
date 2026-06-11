@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // ── Determine folder & transformation based on type ──────────────────────
     let folder: string;
-    let transformation: string;
+    let transformation: any;
     let mediaType: keyof typeof UPLOAD_LIMITS;
 
     switch (uploadType) {

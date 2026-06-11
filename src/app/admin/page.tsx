@@ -82,7 +82,7 @@ export default function AdminPage() {
             <div className="space-y-2">
               <h2 className="text-xl font-black text-white tracking-tight">Access Denied</h2>
               <p className="text-xs text-text-secondary leading-relaxed">
-                This dashboard requires Moderator or Administrator privileges.
+                This dashboard requires Administrator privileges.
               </p>
             </div>
             <Link href="/feed" className="block w-full py-3 rounded-2xl bg-primary hover:bg-primary-hover text-white font-bold text-sm transition-all shadow-glow-sm">

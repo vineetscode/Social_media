@@ -16,6 +16,10 @@ import {
   Tv,
   Send,
   X,
+  Share2,
+  Flag,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 
 interface Profile { username: string; displayName: string; avatarUrl?: string; isVerified?: boolean; }
@@ -38,11 +42,39 @@ export default function ReelsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeHearts, setActiveHearts] = useState<Record<string, boolean>>({});
 
+  // Comments Drawer States
+  const [activeCommentReelId, setActiveCommentReelId] = useState<string | null>(null);
+  const [reelComments, setReelComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+
+  // Sharing & Reporting States
+  const [copiedReelId, setCopiedReelId] = useState<string | null>(null);
+  const [reportingReelId, setReportingReelId] = useState<string | null>(null);
+  const [reportReason, setReportReason] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
   useEffect(() => {
     if (isLoaded && user) {
       fetch("/api/reels")
-        .then((r) => r.json())
-        .then((d) => { if (Array.isArray(d)) setReels(d); setIsLoading(false); })
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed to load reels");
+          return r.json();
+        })
+        .then((d) => {
+          if (Array.isArray(d)) {
+            setReels(d);
+            const initialLikes: Record<string, boolean> = {};
+            d.forEach((reel: any) => {
+              initialLikes[reel.id] = reel.likes && reel.likes.length > 0;
+            });
+            setLikedReels(initialLikes);
+          }
+          setIsLoading(false);
+        })
         .catch(() => setIsLoading(false));
     }
   }, [isLoaded, user]);
@@ -69,6 +101,88 @@ export default function ReelsPage() {
     setActiveHearts((prev) => ({ ...prev, [reelId]: true }));
     handleToggleLike(reelId, true);
     setTimeout(() => setActiveHearts((prev) => ({ ...prev, [reelId]: false })), 850);
+  };
+
+  const handleOpenComments = async (reelId: string) => {
+    setActiveCommentReelId(reelId);
+    setLoadingComments(true);
+    try {
+      const res = await fetch(`/api/comments?reelId=${reelId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setReelComments(data);
+      }
+    } catch (err) {
+      console.error("Reel comments load error:", err);
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+
+  const handleAddReelComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeCommentReelId || !commentInput.trim() || isSubmittingComment) return;
+    setIsSubmittingComment(true);
+    try {
+      const res = await fetch("/api/comments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reelId: activeCommentReelId, content: commentInput }),
+      });
+      if (res.ok) {
+        const newComment = await res.json();
+        setReelComments((prev) => [...prev, newComment]);
+        setCommentInput("");
+        setReels((prev) =>
+          prev.map((r) => {
+            if (r.id === activeCommentReelId) {
+              return { ...r, _count: { ...r._count, comments: r._count.comments + 1 } };
+            }
+            return r;
+          })
+        );
+      }
+    } catch (err) {
+      console.error("Reel comment error:", err);
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const handleShareReel = (reelId: string) => {
+    const url = `${window.location.origin}/reel/${reelId}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedReelId(reelId);
+      setTimeout(() => setCopiedReelId(null), 2000);
+    });
+  };
+
+  const handleReportReel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reportingReelId || !reportReason.trim() || isSubmittingReport) return;
+    setIsSubmittingReport(true);
+    setReportError(null);
+    setReportSuccess(false);
+    try {
+      const res = await fetch("/api/posts/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reelId: reportingReelId, reason: reportReason }),
+      });
+      if (res.ok) {
+        setReportSuccess(true);
+        setReportReason("");
+        setTimeout(() => setReportingReelId(null), 1500);
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setReportError(err.error || "Failed to submit report.");
+      }
+    } catch (err) {
+      console.error(err);
+      setReportError("Network error. Unable to submit report.");
+    } finally {
+      setIsSubmittingReport(false);
+    }
   };
 
   const handlePublishReel = async (e: React.FormEvent) => {
@@ -198,10 +312,22 @@ export default function ReelsPage() {
                           <span className="text-[10px] font-bold">{reel._count.likes}</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
-                          <button className="p-3 rounded-full bg-black/40 border border-white/10 active:scale-90 transition-transform">
+                          <button onClick={() => handleOpenComments(reel.id)} className="p-3 rounded-full bg-black/40 border border-white/10 active:scale-90 transition-transform">
                             <MessageCircle className="w-5 h-5" />
                           </button>
                           <span className="text-[10px] font-bold">{reel._count.comments}</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <button onClick={() => handleShareReel(reel.id)} className={`p-3 rounded-full bg-black/40 border border-white/10 active:scale-90 transition-transform ${copiedReelId === reel.id ? "text-accent" : ""}`}>
+                            <Share2 className="w-5 h-5" />
+                          </button>
+                          <span className="text-[10px] font-bold">{copiedReelId === reel.id ? "Copied!" : "Share"}</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <button onClick={() => setReportingReelId(reel.id)} className="p-3 rounded-full bg-black/40 border border-white/10 active:scale-90 transition-transform text-red-400 hover:text-red-300">
+                            <Flag className="w-5 h-5" />
+                          </button>
+                          <span className="text-[10px] font-bold text-red-400/80">Report</span>
                         </div>
                         <div className="flex flex-col items-center gap-1">
                           <div className="p-3 rounded-full bg-black/40 border border-white/10 text-white/60">
@@ -255,6 +381,145 @@ export default function ReelsPage() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reel Comments Drawer */}
+      <AnimatePresence>
+        {activeCommentReelId && (
+          <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 backdrop-blur-xs">
+            {/* Close trigger overlay */}
+            <div className="absolute inset-0" onClick={() => setActiveCommentReelId(null)} />
+            
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 30, stiffness: 300 }}
+              className="w-full max-w-md h-[70vh] bg-[#13161d]/95 backdrop-blur-md rounded-t-3xl border-t border-white/10 p-5 flex flex-col z-10 relative shadow-float"
+            >
+              {/* Drag indicator */}
+              <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4" />
+
+              <div className="flex justify-between items-center pb-3 border-b border-white/5">
+                <h3 className="text-sm font-bold text-white">Comments</h3>
+                <button onClick={() => setActiveCommentReelId(null)} className="p-1.5 rounded-xl hover:bg-white/5 text-text-muted hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Scrollable comments list */}
+              <div className="flex-1 overflow-y-auto py-4 space-y-3.5 scrollbar-none">
+                {loadingComments ? (
+                  <div className="flex flex-col items-center justify-center py-10 gap-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    <span className="text-xs text-text-muted">Loading comments...</span>
+                  </div>
+                ) : reelComments.length === 0 ? (
+                  <p className="text-xs text-text-muted italic text-center py-10">No comments yet. Be the first to comment!</p>
+                ) : (
+                  reelComments.map((comment) => (
+                    <div key={comment.id} className="flex items-start gap-3 text-xs text-text-secondary leading-relaxed font-sans">
+                      <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex-shrink-0 flex items-center justify-center">
+                        {comment.author?.profile?.avatarUrl ? (
+                          <img src={comment.author.profile.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-xs font-bold">{comment.author?.profile?.displayName?.substring(0, 1).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <div className="flex-1 bg-white/3 rounded-2xl px-3.5 py-2.5 border border-white/5">
+                        <p className="font-bold text-white text-[11px] mb-0.5">
+                          @{comment.author?.profile?.username || "user"}
+                        </p>
+                        <p className="break-words">{comment.content}</p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Input section */}
+              <form onSubmit={handleAddReelComment} className="pt-3 border-t border-white/5 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="flex-1 px-4 py-3 rounded-2xl bg-white/3 border border-white/10 text-white placeholder-text-faint text-xs focus:outline-none focus:border-primary/50 transition-colors"
+                />
+                <button
+                  type="submit"
+                  disabled={!commentInput.trim() || isSubmittingComment}
+                  className="p-3 rounded-2xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white transition-all shadow-glow-sm"
+                >
+                  <Send className="w-4 h-4" />
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reel Report Modal */}
+      <AnimatePresence>
+        {reportingReelId && (
+          <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 30 }}
+              className="w-full max-w-md glass-card rounded-3xl p-6 relative shadow-float space-y-5"
+            >
+              <button 
+                onClick={() => setReportingReelId(null)} 
+                className="absolute top-4 right-4 p-2 rounded-xl hover:bg-white/5 text-text-muted hover:text-white transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div>
+                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                  <Flag className="w-5 h-5 text-red-400" /> Report Reel
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">Let us know what's wrong. We review reports confidentially.</p>
+              </div>
+
+              {reportSuccess ? (
+                <div className="flex flex-col items-center py-6 gap-2 text-accent">
+                  <CheckCircle2 className="w-12 h-12" />
+                  <p className="text-sm font-bold">Report Submitted Successfully</p>
+                  <p className="text-xs text-text-muted text-center font-sans">Thank you for helping keep JabWeMet safe.</p>
+                </div>
+              ) : (
+                <form onSubmit={handleReportReel} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="section-label">Reason for reporting</label>
+                    <textarea 
+                      value={reportReason} 
+                      onChange={(e) => setReportReason(e.target.value)} 
+                      placeholder="Why are you reporting this reel? (e.g. spam, harassment, explicit content)" 
+                      className="w-full min-h-[100px] p-4 rounded-2xl bg-background-elevated/50 border border-white/10 text-white placeholder-text-faint resize-none text-sm input-glow" 
+                      required
+                    />
+                  </div>
+                  
+                  {reportError && (
+                    <div className="flex items-center gap-2 text-xs text-accent-rose bg-accent-rose/10 p-3 rounded-xl">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                      <span>{reportError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 justify-end pt-1">
+                    <button type="button" onClick={() => setReportingReelId(null)} className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-white transition-colors">Cancel</button>
+                    <button type="submit" disabled={isSubmittingReport || !reportReason.trim()} className="px-5 py-2.5 rounded-2xl bg-accent hover:bg-accent/90 text-black font-bold text-xs disabled:opacity-60 transition-all flex items-center gap-1.5 shadow-glow-sm">
+                      {isSubmittingReport ? "Submitting..." : "Submit Report"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </motion.div>
           </div>
         )}

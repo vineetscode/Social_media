@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X, ChevronLeft, ChevronRight, Loader2, Image as ImageIcon } from "lucide-react";
+import { Plus, X, ChevronLeft, ChevronRight, Loader2, Image as ImageIcon, AlertCircle } from "lucide-react";
 import ImageUploader from "@/components/image-uploader";
+import { getOptimizedMediaUrl } from "@/lib/media-optimize";
 
 interface Profile {
   username: string;
@@ -41,10 +42,14 @@ export default function StoriesCarousel() {
   const [uploadedStoryUrl, setUploadedStoryUrl] = useState("");
   const [isPublishing, setIsPublishing] = useState(false);
   const [storyProgress, setStoryProgress] = useState(0);
+  const [storyError, setStoryError] = useState<string | null>(null);
 
   const fetchStories = () => {
     fetch("/api/stories")
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load stories: " + res.status);
+        return res.json();
+      })
       .then((data: Story[]) => {
         if (!Array.isArray(data)) return;
 
@@ -167,6 +172,7 @@ export default function StoriesCarousel() {
     if (!uploadedStoryUrl.trim() || isPublishing) return;
 
     setIsPublishing(true);
+    setStoryError(null);
     try {
       const response = await fetch("/api/stories", {
         method: "POST",
@@ -178,9 +184,13 @@ export default function StoriesCarousel() {
         fetchStories();
         setUploadedStoryUrl("");
         setShowAddModal(false);
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        setStoryError(errData.error || "Failed to publish story.");
       }
     } catch (err) {
       console.error("Failed to publish story:", err);
+      setStoryError("Network error. Unable to publish story.");
     } finally {
       setIsPublishing(false);
     }
@@ -195,9 +205,22 @@ export default function StoriesCarousel() {
       <div className="flex gap-4 items-center overflow-x-auto py-2 scrollbar-none select-none">
         
         {/* Create Story Button */}
-        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer" onClick={() => setShowAddModal(true)}>
-          <div className="w-14 h-14 rounded-full border border-dashed border-white/20 flex items-center justify-center hover:border-primary hover:bg-white/5 transition-all">
-            <Plus className="w-5 h-5 text-text-secondary" />
+        <div className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer relative" onClick={() => setShowAddModal(true)}>
+          <div className="w-14 h-14 rounded-full p-[2.5px] border border-white/10 relative hover:scale-105 transition-transform duration-300">
+            {user?.imageUrl ? (
+              <img
+                src={getOptimizedMediaUrl(user.imageUrl, 120)}
+                alt="Your avatar"
+                className="w-full h-full rounded-full object-cover border border-background"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-background-elevated flex items-center justify-center text-primary font-bold text-sm border border-background">
+                Y
+              </div>
+            )}
+            <div className="absolute bottom-0 right-0 w-4.5 h-4.5 bg-primary rounded-full flex items-center justify-center border border-background shadow-md">
+              <Plus className="w-3 h-3 text-white" />
+            </div>
           </div>
           <span className="text-[10px] text-text-muted font-bold">Your Story</span>
         </div>
@@ -212,7 +235,7 @@ export default function StoriesCarousel() {
             <div className="w-14 h-14 rounded-full p-[2.5px] bg-gradient-to-tr from-primary via-primary-neon to-accent hover:scale-105 transition-transform duration-300">
               {group.avatarUrl ? (
                 <img
-                  src={group.avatarUrl}
+                  src={getOptimizedMediaUrl(group.avatarUrl, 120)}
                   alt={group.displayName}
                   className="w-full h-full rounded-full object-cover border border-background"
                 />
@@ -302,7 +325,7 @@ export default function StoriesCarousel() {
               {/* STORY IMAGE BODY */}
               <div className="flex-1 w-full h-full relative z-0 flex items-center justify-center bg-black/10">
                 <img
-                  src={activeStory.media[0]?.url}
+                  src={getOptimizedMediaUrl(activeStory.media[0]?.url, 1080)}
                   alt="Story Content"
                   className="w-full h-full object-contain pointer-events-none"
                 />
@@ -337,6 +360,13 @@ export default function StoriesCarousel() {
               </div>
 
               <form onSubmit={handleAddStory} className="space-y-4">
+                {/* Error display */}
+                {storyError && (
+                  <div className="p-3 rounded-2xl bg-accent-rose/10 border border-accent-rose/25 text-accent-rose text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                    <span>{storyError}</span>
+                  </div>
+                )}
                 <div className="space-y-1">
                   <label className="section-label">Upload Story Image</label>
                   <ImageUploader

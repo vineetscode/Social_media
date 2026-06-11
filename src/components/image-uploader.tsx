@@ -25,9 +25,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Upload, X, CheckCircle, AlertCircle, Image as ImageIcon, Loader2 } from "lucide-react";
 
 const TYPE_LIMITS = {
-  post:   { maxMB: 10, label: "Post Image",    accept: "image/jpeg,image/png,image/webp,image/gif" },
-  avatar: { maxMB: 5,  label: "Profile Photo", accept: "image/jpeg,image/png,image/webp" },
-  story:  { maxMB: 15, label: "Story",         accept: "image/jpeg,image/png,image/webp,image/gif" },
+  post:   { maxMB: 10, label: "Post Image",    accept: "image/jpeg,image/jpg,image/png,image/webp,image/gif" },
+  avatar: { maxMB: 5,  label: "Profile Photo", accept: "image/jpeg,image/jpg,image/png,image/webp" },
+  story:  { maxMB: 15, label: "Story",         accept: "image/jpeg,image/jpg,image/png,image/webp,image/gif" },
 } as const;
 
 interface ImageUploaderProps {

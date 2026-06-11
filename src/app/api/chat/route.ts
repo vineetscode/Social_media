@@ -22,6 +22,7 @@ export async function GET(request: Request) {
 
   try {
     const history = await ChatService.getChatHistory(userId, recipientId, 50);
+    await ChatService.markAsRead(userId, recipientId);
     return NextResponse.json(history);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

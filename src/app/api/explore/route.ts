@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   try {
     const [posts, creators] = await Promise.all([
-      ExploreService.getGlobalTrendingFeed(20),
+      ExploreService.getGlobalTrendingFeed(userId, 20),
       ExploreService.getPopularCreators(6),
     ]);
 

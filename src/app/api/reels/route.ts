@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   await syncUserWithDb(userId);
 
   try {
-    const reels = await ReelService.getReels(15);
+    const reels = await ReelService.getReels(userId, 15);
     return NextResponse.json(reels);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -34,23 +34,23 @@ export type UploadFolder = (typeof FOLDERS)[keyof typeof FOLDERS];
 export const UPLOAD_LIMITS = {
   image: {
     maxBytes: 10 * 1024 * 1024,       // 10 MB
-    allowedTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    transformations: "q_auto,f_auto,c_limit,w_2048",
+    allowedTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"],
+    transformations: { quality: "auto", fetch_format: "auto", crop: "limit", width: 2048 },
   },
   video: {
     maxBytes: 200 * 1024 * 1024,      // 200 MB
     allowedTypes: ["video/mp4", "video/webm", "video/quicktime"],
-    transformations: "q_auto,vc_auto",
+    transformations: { quality: "auto", video_codec: "auto" },
   },
   avatar: {
     maxBytes: 5 * 1024 * 1024,        // 5 MB
-    allowedTypes: ["image/jpeg", "image/png", "image/webp"],
-    transformations: "q_auto,f_auto,c_fill,g_face,w_400,h_400,r_max",
+    allowedTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp"],
+    transformations: { quality: "auto", fetch_format: "auto", crop: "fill", gravity: "face", width: 400, height: 400, radius: "max" },
   },
   story: {
     maxBytes: 15 * 1024 * 1024,       // 15 MB
-    allowedTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    transformations: "q_auto,f_auto,c_limit,w_1080,h_1920",
+    allowedTypes: ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"],
+    transformations: { quality: "auto", fetch_format: "auto", crop: "limit", width: 1080, height: 1920 },
   },
 } as const;
 
@@ -72,7 +72,7 @@ export interface CloudinaryUploadResult {
 export async function uploadImage(
   fileBuffer: Buffer,
   folder: UploadFolder,
-  transformation: string = UPLOAD_LIMITS.image.transformations
+  transformation: any = UPLOAD_LIMITS.image.transformations
 ): Promise<CloudinaryUploadResult> {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
@@ -98,7 +98,7 @@ export async function uploadImage(
 export async function uploadVideo(
   fileBuffer: Buffer,
   folder: UploadFolder,
-  transformation: string = UPLOAD_LIMITS.video.transformations
+  transformation: any = UPLOAD_LIMITS.video.transformations
 ): Promise<CloudinaryUploadResult> {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(

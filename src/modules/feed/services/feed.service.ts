@@ -28,6 +28,14 @@ export class FeedService {
           },
         },
         media: true,
+        likes: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            userId: true,
+          },
+        },
         _count: {
           select: {
             likes: true,
@@ -62,6 +70,14 @@ export class FeedService {
           },
         },
         media: true,
+        likes: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            userId: true,
+          },
+        },
         _count: {
           select: {
             likes: true,

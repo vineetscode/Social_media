@@ -39,7 +39,13 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isLoaded || !user) return;
-    fetch("/api/users").then((r) => r.json()).then((data) => { if (Array.isArray(data)) setUsers(data); });
+    fetch("/api/users")
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load users");
+        return r.json();
+      })
+      .then((data) => { if (Array.isArray(data)) setUsers(data); })
+      .catch((err) => console.error(err));
   }, [isLoaded, user]);
 
   useEffect(() => {
@@ -62,8 +68,12 @@ export default function ChatPage() {
   useEffect(() => {
     if (!user || !activeRecipient) return;
     fetch(`/api/chat?recipientId=${activeRecipient.userId}`)
-      .then((r) => r.json())
-      .then((data) => { setMessages(Array.isArray(data) ? data.reverse() : []); });
+      .then((r) => {
+        if (!r.ok) throw new Error("Failed to load messages");
+        return r.json();
+      })
+      .then((data) => { setMessages(Array.isArray(data) ? data.reverse() : []); })
+      .catch((err) => console.error(err));
     setIsTyping(true);
     const timer = setTimeout(() => setIsTyping(false), 1800);
     return () => clearTimeout(timer);

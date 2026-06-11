@@ -18,7 +18,7 @@ export async function GET() {
       select: { role: true },
     });
 
-    if (!currentUser || (currentUser.role !== "ADMIN" && currentUser.role !== "MODERATOR")) {
+    if (!currentUser || currentUser.role !== "ADMIN") {
       return NextResponse.json({ error: "Access Denied. Admin privileges required." }, { status: 403 });
     }
 
@@ -89,8 +89,8 @@ export async function POST(request: Request) {
       select: { role: true },
     });
 
-    if (!currentUser || (currentUser.role !== "ADMIN" && currentUser.role !== "MODERATOR")) {
-      return NextResponse.json({ error: "Access Denied" }, { status: 403 });
+    if (!currentUser || currentUser.role !== "ADMIN") {
+      return NextResponse.json({ error: "Access Denied. Admin privileges required." }, { status: 403 });
     }
 
     const { reportId, action } = await request.json();

@@ -13,12 +13,13 @@ import {
   Loader2,
   MessageSquare,
   AtSign,
+  Zap,
 } from "lucide-react";
 
 interface Profile { username: string; displayName: string; avatarUrl?: string; }
 interface Notification {
   id: string;
-  type: "LIKE" | "COMMENT" | "FOLLOW" | "MESSAGE" | "MENTION";
+  type: "LIKE" | "COMMENT" | "FOLLOW" | "MESSAGE" | "MENTION" | "POST";
   referenceId?: string;
   isRead: boolean;
   createdAt: string;
@@ -32,6 +33,7 @@ const notifText = (type: Notification["type"]) => {
     FOLLOW: "started following you",
     MESSAGE: "sent you a message",
     MENTION: "mentioned you in a caption",
+    POST: "published a new post",
   };
   return map[type] || "interacted with you";
 };
@@ -44,6 +46,7 @@ const notifIcon = (type: Notification["type"]) => {
     FOLLOW: <UserPlus className={`${classes} text-accent-cyan`} />,
     MESSAGE: <MessageSquare className={`${classes} text-primary-neon`} />,
     MENTION: <AtSign className={`${classes} text-accent-amber`} />,
+    POST: <Zap className={`${classes} text-primary fill-primary`} />,
   };
   return map[type] || <Bell className={`${classes} text-text-secondary`} />;
 };
@@ -55,6 +58,7 @@ const notifColor = (type: Notification["type"]) => {
     FOLLOW: "bg-accent-cyan/10",
     MESSAGE: "bg-primary-neon/10",
     MENTION: "bg-accent-amber/10",
+    POST: "bg-primary/10",
   };
   return map[type] || "bg-white/5";
 };
@@ -67,7 +71,10 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (isLoaded && user) {
       fetch("/api/notifications")
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("Failed to load notifications");
+          return r.json();
+        })
         .then((data) => { if (Array.isArray(data)) setNotifications(data); setIsLoading(false); })
         .catch(() => setIsLoading(false));
     }

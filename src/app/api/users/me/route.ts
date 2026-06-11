@@ -4,14 +4,14 @@ import prisma from "@/lib/prisma";
 import { syncUserWithDb } from "@/lib/auth-sync";
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  await syncUserWithDb(userId);
-
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    await syncUserWithDb(userId);
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -29,6 +29,11 @@ export async function GET() {
             followingCount: true,
           },
         },
+        following: {
+          select: {
+            followingId: true,
+          },
+        },
       },
     });
 
@@ -38,6 +43,7 @@ export async function GET() {
 
     return NextResponse.json(user);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("[GET /api/users/me Error]", error);
+    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
   }
 }

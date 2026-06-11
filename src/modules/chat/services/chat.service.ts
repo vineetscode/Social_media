@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { UserService } from "@/modules/user/services/user.service";
+import { NotificationService } from "@/modules/notification/services/notification.service";
 
 export class ChatService {
   // Send a direct message to a user, checking blocks first
@@ -10,7 +11,7 @@ export class ChatService {
       throw new Error("Unable to send message: Block restrictions active.");
     }
 
-    return prisma.message.create({
+    const message = await prisma.message.create({
       data: {
         senderId,
         recipientId,
@@ -31,6 +32,11 @@ export class ChatService {
         },
       },
     });
+
+    // Create a notification for the recipient
+    await NotificationService.createNotification(recipientId, senderId, "MESSAGE", message.id);
+
+    return message;
   }
 
   // Retrieve message history between two users

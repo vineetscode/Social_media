@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { FollowService } from "@/modules/follow/services/follow.service";
+import { NotificationService } from "@/modules/notification/services/notification.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
 import prisma from "@/lib/prisma";
 
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
       await FollowService.unfollowUser(userId, followingId);
       return NextResponse.json({ following: false });
     } else {
-      await FollowService.followUser(userId, followingId);
+      const follow = await FollowService.followUser(userId, followingId);
+      await NotificationService.createNotification(followingId, userId, "FOLLOW", follow.id);
       return NextResponse.json({ following: true });
     }
   } catch (error: any) {

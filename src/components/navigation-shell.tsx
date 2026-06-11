@@ -17,7 +17,9 @@ import {
   Menu,
   Zap,
   ChevronRight,
+  User,
 } from "lucide-react";
+import { getOptimizedMediaUrl } from "@/lib/media-optimize";
 
 interface UserMe {
   id: string;
@@ -34,18 +36,17 @@ const NAV_LINKS = [
   { href: "/feed",          icon: Home,         label: "Feed" },
   { href: "/explore",       icon: Compass,      label: "Explore" },
   { href: "/reels",         icon: Film,         label: "Reels" },
-  { href: "/search",        icon: Search,       label: "Search" },
   { href: "/chat",          icon: MessageSquare,label: "Messages" },
   { href: "/notifications", icon: Bell,         label: "Notifications" },
+  { href: "/profile",       icon: User,         label: "Profile" },
 ];
 
 const DOCK_LINKS = [
   { href: "/feed",          icon: Home,         label: "Home" },
   { href: "/explore",       icon: Compass,      label: "Explore" },
   { href: "/reels",         icon: Film,         label: "Reels" },
-  { href: "/search",        icon: Search,       label: "Search" },
-  { href: "/notifications", icon: Bell,         label: "Activity" },
   { href: "/chat",          icon: MessageSquare,label: "Chat" },
+  { href: "/profile",       icon: User,         label: "Profile" },
 ];
 
 export default function NavigationShell({
@@ -59,6 +60,8 @@ export default function NavigationShell({
   const pathname = usePathname();
   const [userMe, setUserMe] = useState<UserMe | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   const fetchUserMe = useCallback(async () => {
     try {
@@ -70,19 +73,34 @@ export default function NavigationShell({
     } catch (_) {}
   }, []);
 
+  const fetchUnreadCounts = useCallback(async () => {
+    try {
+      const res = await fetch("/api/unread-counts");
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadNotifications(data.unreadNotifications || 0);
+        setUnreadMessages(data.unreadMessages || 0);
+      }
+    } catch (_) {}
+  }, []);
+
   useEffect(() => {
     if (isLoaded && user) {
       fetchUserMe();
+      fetchUnreadCounts();
+
+      // Poll unread counts every 10 seconds
+      const interval = setInterval(fetchUnreadCounts, 10000);
+      return () => clearInterval(interval);
     }
-  }, [isLoaded, user, fetchUserMe]);
+  }, [isLoaded, user, fetchUserMe, fetchUnreadCounts, pathname]);
 
   // Close drawer when navigating
   useEffect(() => {
     setDrawerOpen(false);
   }, [pathname]);
 
-  const isAdmin =
-    userMe?.role === "ADMIN" || userMe?.role === "MODERATOR";
+  const isAdmin = userMe?.role === "ADMIN";
 
   const isActive = (href: string) => pathname === href;
 
@@ -141,11 +159,23 @@ export default function NavigationShell({
                     : "text-text-muted hover:text-text-primary hover:bg-white/5"
                 }`}
               >
-                <Icon
-                  className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
-                    active ? "text-primary" : ""
-                  }`}
-                />
+                <div className="relative flex items-center justify-center">
+                  <Icon
+                    className={`w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110 ${
+                      active ? "text-primary" : ""
+                    }`}
+                  />
+                  {label === "Notifications" && unreadNotifications > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
+                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                    </span>
+                  )}
+                  {label === "Messages" && unreadMessages > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
+                </div>
                 <span className="hidden lg:block truncate">{label}</span>
                 {active && (
                   <motion.div
@@ -181,19 +211,30 @@ export default function NavigationShell({
 
         {/* User Profile Bar */}
         <div className="px-3 lg:px-4 py-4">
-          <div className="flex items-center justify-center lg:justify-start gap-3 p-2.5 rounded-2xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors duration-200">
-            <div className="flex-shrink-0">
-              <UserButton afterSignOutUrl="/" />
+          <Link
+            href={`/profile/${userMe?.profile?.username || user?.username || ""}`}
+            className="flex items-center justify-center lg:justify-start gap-3 p-2.5 rounded-2xl bg-white/3 border border-white/5 hover:bg-white/5 transition-colors duration-200 w-full"
+          >
+            <div className="w-8 h-8 rounded-full overflow-hidden border border-white/10 flex-shrink-0 bg-white/5 flex items-center justify-center">
+              {userMe?.profile?.avatarUrl || user?.imageUrl ? (
+                <img
+                  src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 80)}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <User className="w-4 h-4 text-text-muted" />
+              )}
             </div>
-            <div className="hidden lg:block overflow-hidden">
+            <div className="hidden lg:block overflow-hidden flex-1 hover:opacity-80 transition-opacity text-left">
               <p className="text-xs font-bold text-text-primary truncate leading-tight">
                 {user?.fullName || "—"}
               </p>
               <p className="text-[10px] text-text-muted truncate">
-                @{user?.username || "—"}
+                @{userMe?.profile?.username || user?.username || "—"}
               </p>
             </div>
-          </div>
+          </Link>
         </div>
       </aside>
 
@@ -219,7 +260,20 @@ export default function NavigationShell({
 
         {/* Right side — user button */}
         <div className="flex items-center gap-3">
-          <UserButton afterSignOutUrl="/" />
+          <Link
+            href={`/profile/${userMe?.profile?.username || user?.username || ""}`}
+            className="w-8 h-8 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center hover:opacity-80 transition-opacity"
+          >
+            {userMe?.profile?.avatarUrl || user?.imageUrl ? (
+              <img
+                src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 80)}
+                alt="Profile"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <User className="w-4 h-4 text-text-muted" />
+            )}
+          </Link>
         </div>
       </header>
 
@@ -268,17 +322,30 @@ export default function NavigationShell({
 
               {/* User profile card */}
               <div className="px-5 py-4 border-b border-white/5">
-                <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/4 border border-white/5">
-                  <UserButton afterSignOutUrl="/" />
-                  <div className="overflow-hidden">
+                <Link
+                  href={`/profile/${userMe?.profile?.username || user?.username || ""}`}
+                  className="flex items-center gap-3 p-3 rounded-2xl bg-white/4 border border-white/5 hover:bg-white/6 transition-colors w-full"
+                >
+                  <div className="w-9 h-9 rounded-full overflow-hidden border border-white/10 bg-white/5 flex items-center justify-center">
+                    {userMe?.profile?.avatarUrl || user?.imageUrl ? (
+                      <img
+                        src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 90)}
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-4 h-4 text-text-muted" />
+                    )}
+                  </div>
+                  <div className="overflow-hidden flex-1 text-left">
                     <p className="text-sm font-bold text-white truncate">
                       {user?.fullName || "—"}
                     </p>
                     <p className="text-[10px] text-text-muted truncate">
-                      @{user?.username || "—"}
+                      @{userMe?.profile?.username || user?.username || "—"}
                     </p>
                   </div>
-                </div>
+                </Link>
               </div>
 
               {/* Drawer Navigation Links */}
@@ -297,9 +364,21 @@ export default function NavigationShell({
                           : "text-text-muted hover:text-text-primary hover:bg-white/5"
                       }`}
                     >
-                      <Icon
-                        className={`w-5 h-5 flex-shrink-0 ${active ? "text-primary" : ""}`}
-                      />
+                      <div className="relative flex items-center justify-center">
+                        <Icon
+                          className={`w-5 h-5 flex-shrink-0 ${active ? "text-primary" : ""}`}
+                        />
+                        {label === "Notifications" && unreadNotifications > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
+                            {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                          </span>
+                        )}
+                        {label === "Messages" && unreadMessages > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
+                            {unreadMessages > 99 ? "99+" : unreadMessages}
+                          </span>
+                        )}
+                      </div>
                       <span className="flex-1">{label}</span>
                       {active && (
                         <ChevronRight className="w-4 h-4 text-primary/60" />
@@ -366,13 +445,20 @@ export default function NavigationShell({
                     transition={{ type: "spring", stiffness: 350, damping: 30 }}
                   />
                 )}
-                <Icon
-                  className={`w-5 h-5 relative z-10 transition-all duration-200 ${
-                    active
-                      ? "text-primary scale-110 drop-shadow-[0_0_6px_rgba(99,102,241,0.6)]"
-                      : "text-text-muted group-hover:text-text-secondary group-hover:scale-105"
-                  }`}
-                />
+                <div className="relative flex items-center justify-center z-10">
+                  <Icon
+                    className={`w-5 h-5 transition-all duration-200 ${
+                      active
+                        ? "text-primary scale-110 drop-shadow-[0_0_6px_rgba(99,102,241,0.6)]"
+                        : "text-text-muted group-hover:text-text-secondary group-hover:scale-105"
+                    }`}
+                  />
+                  {label === "Chat" && unreadMessages > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90 z-20">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
+                </div>
               </Link>
             );
           })}
