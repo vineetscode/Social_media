@@ -8,20 +8,20 @@ import { syncUserWithDb } from "@/lib/auth-sync";
 
 // GET: Retrieve comments for a Post or Reel
 export async function GET(request: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const { searchParams } = new URL(request.url);
-  const postId = searchParams.get("postId");
-  const reelId = searchParams.get("reelId");
-
-  if (!postId && !reelId) {
-    return NextResponse.json({ error: "Missing postId or reelId parameter" }, { status: 400 });
-  }
-
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const postId = searchParams.get("postId");
+    const reelId = searchParams.get("reelId");
+
+    if (!postId && !reelId) {
+      return NextResponse.json({ error: "Missing postId or reelId parameter" }, { status: 400 });
+    }
+
     const comments = await prisma.comment.findMany({
       where: {
         postId: postId || undefined,
@@ -46,21 +46,24 @@ export async function GET(request: Request) {
     return NextResponse.json(comments);
   } catch (error: any) {
     console.error("[GET /api/comments Error]", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Out of Service", message: "Sorry for the inconvenience. The system is temporarily offline." },
+      { status: 503 }
+    );
   }
 }
 
 // POST: Add a new comment
 export async function POST(request: Request) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Ensure user profile sync exists
-  await syncUserWithDb(userId);
-
   try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Ensure user profile sync exists
+    await syncUserWithDb(userId);
+
     const { postId, reelId, content } = await request.json();
     if (!content || content.trim() === "") {
       return NextResponse.json({ error: "Comment content is required" }, { status: 400 });
@@ -110,6 +113,9 @@ export async function POST(request: Request) {
     return NextResponse.json(comment);
   } catch (error: any) {
     console.error("[POST /api/comments Error]", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Out of Service", message: "Sorry for the inconvenience. The system is temporarily offline." },
+      { status: 503 }
+    );
   }
 }
