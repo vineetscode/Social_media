@@ -67,6 +67,9 @@ export default function Home() {
         className="w-full max-w-5xl flex justify-between items-center z-10 py-4 px-6 border border-white/5 glass-panel rounded-2xl shadow-glass"
       >
         <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-glow-sm">
+            <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+          </div>
           <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-primary to-primary-neon bg-clip-text text-transparent tracking-tight">
             JabWeMet
           </span>
@@ -131,7 +134,7 @@ export default function Home() {
           variants={itemVariants}
           className="text-text-secondary text-base sm:text-lg md:text-xl max-w-xl mb-10 leading-relaxed"
         >
-          JabWeMet bridges loops, chats, and creator flows. A responsive, dynamic playground built for digital creators and communities.
+          JabWeMet is a next-generation social ecosystem designed for Gen-Z and digital creators. Share your stories, post interactive reels, connect in real-time chat, and engage with a vibrant community.
         </motion.p>
 
         <motion.div variants={itemVariants} className="w-full">

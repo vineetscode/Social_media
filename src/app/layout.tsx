@@ -11,13 +11,13 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: "JabWeMet - Modern Social Platform for Gen-Z & Creators",
-  description: "Share photos, reels, stories, and chat in real-time on JabWeMet.",
-  keywords: ["social media", "creators", "reels", "chat", "genz", "JabWeMet"],
+  title: "JabWeMet - Next-Gen Social Media for Gen-Z & Creators",
+  description: "JabWeMet is a next-generation social ecosystem designed for Gen-Z and digital creators. Share your stories, post interactive reels, connect in real-time chat, and engage with a vibrant creator community in a gorgeous dark-mode playground.",
+  keywords: ["social media", "creators", "reels", "chat", "genz", "JabWeMet", "stories"],
   authors: [{ name: "JabWeMet" }],
   openGraph: {
-    title: "JabWeMet - Modern Social Platform for Gen-Z & Creators",
-    description: "Share photos, reels, stories, and chat in real-time on JabWeMet.",
+    title: "JabWeMet - Next-Gen Social Media for Gen-Z & Creators",
+    description: "JabWeMet is a next-generation social ecosystem designed for Gen-Z and digital creators. Share your stories, post interactive reels, connect in real-time chat, and engage with a vibrant creator community in a gorgeous dark-mode playground.",
     type: "website",
   },
 };
