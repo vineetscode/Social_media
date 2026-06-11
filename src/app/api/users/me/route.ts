@@ -44,6 +44,9 @@ export async function GET() {
     return NextResponse.json(user);
   } catch (error: any) {
     console.error("[GET /api/users/me Error]", error);
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Out of Service", message: "Sorry for the inconvenience. The system is temporarily offline." },
+      { status: 503 }
+    );
   }
 }

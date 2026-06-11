@@ -473,8 +473,8 @@ export default function FeedPage() {
             <div className="p-5 rounded-3xl bg-accent-rose/10 border border-accent-rose/15 text-accent-rose text-sm font-semibold flex items-center gap-3 shadow-glass animate-in fade-in slide-in-from-top-4 duration-300">
               <AlertCircle className="w-5 h-5 flex-shrink-0 animate-pulse" />
               <div className="flex-1 text-xs sm:text-sm">
-                <p className="font-black text-white">Database Offline or Paused</p>
-                <p className="text-text-muted mt-0.5 font-normal">Failed to query feed. Please check that your Supabase instance is active and not paused.</p>
+                <p className="font-black text-white">Out of Service</p>
+                <p className="text-text-muted mt-0.5 font-normal">Sorry for the inconvenience. We are experiencing a temporary network issue. Please check back shortly.</p>
               </div>
               <button 
                 onClick={fetchFeed} 
