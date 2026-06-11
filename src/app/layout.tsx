@@ -28,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || "pk_test_dGhlLXNhbmRib3gtZmFsbGJhY2stMTIuY2xlcmsuYWNjb3VudHMuZGV2JA"}>
       <html lang="en" className={`dark ${outfit.variable}`}>
         <body className="bg-background text-text-primary antialiased min-h-screen font-sans">
           {children}
