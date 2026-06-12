@@ -376,3 +376,14 @@ model Bookmark {
   @@index([userId])
   @@index([postId])
 }
+
+model AnalyticsEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  eventType String
+  payload   Json?
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+  @@index([createdAt])
+}

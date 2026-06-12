@@ -5,6 +5,9 @@ import { useUser } from "@clerk/nextjs";
 import { getSocket } from "@/lib/socket";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationShell from "@/components/navigation-shell";
+import { fetchWithRetry } from "@/lib/api-client";
+import { Analytics } from "@/lib/analytics";
+import { useAppStore } from "@/store";
 import {
   Send,
   Search,
@@ -27,6 +30,7 @@ interface Message {
 
 export default function ChatPage() {
   const { user, isLoaded } = useUser();
+  const onlineUsers = useAppStore((state) => state.onlineUsers);
   const [users, setUsers] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeRecipient, setActiveRecipient] = useState<Profile | null>(null);
@@ -39,7 +43,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (!isLoaded || !user) return;
-    fetch("/api/users")
+    fetchWithRetry("/api/users")
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load users");
         return r.json();
@@ -53,7 +57,15 @@ export default function ChatPage() {
     const socket = getSocket(user.id);
     socketRef.current = socket;
     socket.connect();
-    socket.emit("join_room", { userId: user.id });
+
+    const joinRoom = () => {
+      console.log("[CHAT SOCKET CONNECT] Re-joining room...");
+      socket.emit("join_room", { userId: user.id });
+    };
+
+    socket.on("connect", joinRoom);
+    joinRoom();
+
     socket.on("new_message", (message: Message) => {
       if (
         (message.senderId === user.id && message.recipientId === activeRecipient?.userId) ||
@@ -62,12 +74,17 @@ export default function ChatPage() {
         setMessages((prev) => [...prev, message]);
       }
     });
-    return () => { socket.disconnect(); };
+
+    return () => {
+      socket.off("connect", joinRoom);
+      socket.off("new_message");
+      socket.disconnect();
+    };
   }, [isLoaded, user, activeRecipient]);
 
   useEffect(() => {
     if (!user || !activeRecipient) return;
-    fetch(`/api/chat?recipientId=${activeRecipient.userId}`)
+    fetchWithRetry(`/api/chat?recipientId=${activeRecipient.userId}`)
       .then((r) => {
         if (!r.ok) throw new Error("Failed to load messages");
         return r.json();
@@ -87,7 +104,7 @@ export default function ChatPage() {
     e.preventDefault();
     if (!user || !activeRecipient || !inputText.trim()) return;
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetchWithRetry("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipientId: activeRecipient.userId, content: inputText }),
@@ -96,6 +113,10 @@ export default function ChatPage() {
         const savedMessage = await response.json();
         setMessages((prev) => [...prev, savedMessage]);
         socketRef.current?.emit("send_message", savedMessage);
+        
+        // Track message sent event
+        Analytics.trackClient("message_sent", { recipientId: activeRecipient.userId }).catch(() => {});
+
         setInputText("");
       }
     } catch (error) { console.error("Failed to send:", error); }
@@ -165,10 +186,15 @@ export default function ChatPage() {
                       isActive ? "bg-primary/15 border border-primary/25 text-white" : "hover:bg-white/5 text-text-secondary hover:text-white"
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
-                      isActive ? "bg-primary/30 text-primary" : "bg-white/8 text-text-secondary"
-                    }`}>
-                      {profile.displayName.substring(0, 1).toUpperCase()}
+                    <div className="relative">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                        isActive ? "bg-primary/30 text-primary" : "bg-white/8 text-text-secondary"
+                      }`}>
+                        {profile.displayName.substring(0, 1).toUpperCase()}
+                      </div>
+                      {onlineUsers.includes(profile.userId) && (
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-background shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+                      )}
                     </div>
                     <div className="overflow-hidden flex-1">
                       <h4 className="text-sm font-bold truncate text-white">{profile.displayName}</h4>
@@ -205,7 +231,16 @@ export default function ChatPage() {
                   </div>
                   <div>
                     <h2 className="text-sm font-bold text-white">{activeRecipient.displayName}</h2>
-                    <span className="text-[10px] text-accent font-semibold tracking-wider uppercase">● Online</span>
+                    {onlineUsers.includes(activeRecipient.userId) ? (
+                      <span className="text-[10px] text-accent font-semibold tracking-wider uppercase flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Online
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-text-muted font-semibold tracking-wider uppercase">
+                        Offline
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 text-text-muted">

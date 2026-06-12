@@ -6,6 +6,9 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import NavigationShell from "@/components/navigation-shell";
 import { getOptimizedMediaUrl } from "@/lib/media-optimize";
+import { fetchWithRetry } from "@/lib/api-client";
+import { Analytics } from "@/lib/analytics";
+import { useAppStore } from "@/store";
 import {
   Heart,
   MessageCircle,
@@ -67,6 +70,12 @@ export default function ProfileClient({
 }: ProfileClientProps) {
   const { signOut } = useClerk();
   const router = useRouter();
+  const onlineUsers = useAppStore((state) => state.onlineUsers);
+
+  // Track profile view on mount
+  useEffect(() => {
+    Analytics.trackClient("profile_viewed", { targetUsername, isSelf }).catch(() => {});
+  }, [targetUsername, isSelf]);
 
   // States
   const [profile, setProfile] = useState<ProfileDetails>(initialProfile);
@@ -99,12 +108,18 @@ export default function ProfileClient({
     });
 
     try {
-      const res = await fetch("/api/users/follow", {
+      const res = await fetchWithRetry("/api/users/follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ followingId: profile.userId }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        if (!originalFollowing) {
+          Analytics.trackClient("follow_created", { followedUserId: profile.userId }).catch(() => {});
+        } else {
+          Analytics.trackClient("unfollow_created", { unfollowedUserId: profile.userId }).catch(() => {});
+        }
+      } else {
         // Revert
         setIsFollowing(originalFollowing);
         setProfile((prev) => {
@@ -117,6 +132,14 @@ export default function ProfileClient({
       }
     } catch (err) {
       console.error(err);
+      setIsFollowing(originalFollowing);
+      setProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          followerCount: prev.followerCount + (originalFollowing ? 1 : -1),
+        };
+      });
     }
   };
 
@@ -128,7 +151,7 @@ export default function ProfileClient({
     setEditSuccess(false);
 
     try {
-      const res = await fetch("/api/users/profile/update", {
+      const res = await fetchWithRetry("/api/users/profile/update", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -174,7 +197,7 @@ export default function ProfileClient({
   useEffect(() => {
     if (activeTab === "bookmarked" && isSelf && bookmarkedPosts.length === 0) {
       setIsLoadingBookmarks(true);
-      fetch("/api/feed?bookmarksOnly=true")
+      fetchWithRetry("/api/feed?bookmarksOnly=true")
         .then((r) => (r.ok ? r.json() : []))
         .then((data) => {
           setBookmarkedPosts(data);
@@ -223,6 +246,9 @@ export default function ProfileClient({
             <div className="flex flex-col sm:flex-row items-center gap-4">
               <h1 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2">
                 @{profile.username}
+                {onlineUsers.includes(profile.userId) && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" title="Online" />
+                )}
                 {profile.isVerified && (
                   <span className="text-[10px] font-bold bg-primary/15 text-primary border border-primary/20 px-2 py-0.5 rounded-full">
                     ✓ VIP
@@ -337,12 +363,20 @@ export default function ProfileClient({
             >
               {posts.length === 0 ? (
                 <div className="col-span-3 text-center py-20 glass-card rounded-3xl flex flex-col items-center gap-4 text-text-muted">
-                  <FileText className="w-10 h-10 text-text-faint" />
-                  <div>
-                    <p className="text-sm font-semibold">No Posts Yet</p>
-                    <p className="text-xs text-text-muted mt-1">
+                  <FileText className="w-10 h-10 text-text-faint animate-bounce" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-white">No Posts Yet</p>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">
                       {isSelf ? "Start sharing your vibe on the feed page!" : "This user has not posted anything."}
                     </p>
+                    {isSelf && (
+                      <button
+                        onClick={() => router.push("/feed")}
+                        className="mt-4 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs shadow-glow-sm transition-all"
+                      >
+                        Create Your First Post
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -399,10 +433,16 @@ export default function ProfileClient({
                 </div>
               ) : bookmarkedPosts.length === 0 ? (
                 <div className="col-span-3 text-center py-20 glass-card rounded-3xl flex flex-col items-center gap-4 text-text-muted">
-                  <Bookmark className="w-10 h-10 text-text-faint" />
-                  <div>
-                    <p className="text-sm font-semibold">No Bookmarked Posts</p>
-                    <p className="text-xs text-text-muted mt-1">Saved posts will appear here.</p>
+                  <Bookmark className="w-10 h-10 text-text-faint animate-bounce" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-white">No Bookmarked Posts</p>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">Saved posts will appear here. Find interesting content on your feed and save it for later.</p>
+                    <button
+                      onClick={() => router.push("/feed")}
+                      className="mt-4 px-4 py-2 rounded-xl bg-white/6 border border-white/10 text-white font-bold text-xs hover:bg-white/10 transition-all"
+                    >
+                      Browse Feed
+                    </button>
                   </div>
                 </div>
               ) : (

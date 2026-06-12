@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { FeedService } from "@/modules/feed/services/feed.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
+import prisma from "@/lib/prisma";
 
 export async function GET(request: Request) {
   const startTotal = performance.now();
@@ -23,6 +24,70 @@ export async function GET(request: Request) {
     endAuth = performance.now();
 
     const { searchParams } = new URL(request.url);
+    const bookmarksOnly = searchParams.get("bookmarksOnly") === "true";
+
+    if (bookmarksOnly) {
+      startQuery = performance.now();
+      const bookmarks = await prisma.bookmark.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          post: {
+            include: {
+              author: {
+                select: {
+                  profile: {
+                    select: {
+                      username: true,
+                      displayName: true,
+                      avatarUrl: true,
+                      isVerified: true,
+                    },
+                  },
+                },
+              },
+              media: true,
+              likes: {
+                where: { userId },
+                select: { userId: true },
+              },
+              bookmarks: {
+                where: { userId },
+                select: { userId: true },
+              },
+              _count: {
+                select: {
+                  likes: true,
+                  comments: true,
+                  bookmarks: true,
+                },
+              },
+            },
+          },
+        },
+      });
+      queryCount += 1;
+      endQuery = performance.now();
+
+      const postsResult = bookmarks.map((b) => b.post);
+      const startSerialization = performance.now();
+      const responseBody = JSON.stringify(postsResult);
+      const endSerialization = performance.now();
+      const endTotal = performance.now();
+
+      console.log(
+        `[PERF LOG] GET /api/feed?bookmarksOnly=true | ` +
+        `Total: ${(endTotal - startTotal).toFixed(2)}ms | ` +
+        `Auth: ${(endAuth - startAuth).toFixed(2)}ms | ` +
+        `Query: ${(endQuery - startQuery).toFixed(2)}ms (count: ${queryCount}) | ` +
+        `Serialization: ${(endSerialization - startSerialization).toFixed(2)}ms`
+      );
+
+      return new NextResponse(responseBody, {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
     const limit = parseInt(searchParams.get("limit") || "10");
     const cursor = searchParams.get("cursor") || undefined;
 

@@ -36,10 +36,19 @@ export class FeedService {
             userId: true,
           },
         },
+        bookmarks: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            userId: true,
+          },
+        },
         _count: {
           select: {
             likes: true,
             comments: true,
+            bookmarks: true,
           },
         },
       },
@@ -75,6 +84,14 @@ export class FeedService {
         },
         media: true,
         likes: {
+          where: {
+            userId: userId,
+          },
+          select: {
+            userId: true,
+          },
+        },
+        bookmarks: {
           where: {
             userId: userId,
           },

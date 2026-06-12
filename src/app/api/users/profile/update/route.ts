@@ -9,7 +9,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { username, displayName, bio } = await request.json();
+    const { username, displayName, bio, website, isPrivate } = await request.json();
 
     if (!username || username.trim() === "") {
       return NextResponse.json({ error: "Username is required" }, { status: 400 });
@@ -43,6 +43,8 @@ export async function POST(request: Request) {
         username: username.toLowerCase().trim(),
         displayName: displayName.trim(),
         bio: bio ? bio.trim() : null,
+        website: website !== undefined ? (website ? website.trim() : null) : undefined,
+        isPrivate: isPrivate !== undefined ? isPrivate : undefined,
       },
     });
 

@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   },
 };
 
+import ToastContainer from "@/components/toast-container";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,6 +34,7 @@ export default function RootLayout({
       <html lang="en" className={`dark ${outfit.variable}`}>
         <body className="bg-background text-text-primary antialiased min-h-screen font-sans">
           {children}
+          <ToastContainer />
         </body>
       </html>
     </ClerkProvider>

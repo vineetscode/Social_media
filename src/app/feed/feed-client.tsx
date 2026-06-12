@@ -7,6 +7,9 @@ import NavigationShell from "@/components/navigation-shell";
 import StoriesCarousel from "@/components/stories-carousel";
 import ImageUploader from "@/components/image-uploader";
 import { getOptimizedMediaUrl } from "@/lib/media-optimize";
+import { fetchWithRetry } from "@/lib/api-client";
+import { Analytics } from "@/lib/analytics";
+import { Bookmark as BookmarkIcon } from "lucide-react";
 import {
   Heart,
   MessageCircle,
@@ -49,6 +52,7 @@ interface Post {
   author: Author;
   media?: Media[];
   likes?: { userId: string }[];
+  bookmarks?: { userId: string }[];
   _count: { likes: number; comments: number };
   isOptimistic?: boolean;
 }
@@ -103,8 +107,24 @@ export default function FeedClient({
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Record<string, boolean>>({});
+  const [isOffline, setIsOffline] = useState(false);
   const [isComposerFocused, setIsComposerFocused] = useState(false);
   const [activeHearts, setActiveHearts] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setIsOffline(!window.navigator.onLine);
+      const handleOnline = () => setIsOffline(false);
+      const handleOffline = () => setIsOffline(true);
+      window.addEventListener("online", handleOnline);
+      window.addEventListener("offline", handleOffline);
+      return () => {
+        window.removeEventListener("online", handleOnline);
+        window.removeEventListener("offline", handleOffline);
+      };
+    }
+  }, []);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string | null>(null);
   const [isComposerExpanded, setIsComposerExpanded] = useState(false);
@@ -135,7 +155,7 @@ export default function FeedClient({
     if (!isExpanded && !postComments[postId]) {
       setLoadingComments((prev) => ({ ...prev, [postId]: true }));
       try {
-        const res = await fetch(`/api/comments?postId=${postId}`);
+        const res = await fetchWithRetry(`/api/comments?postId=${postId}`);
         if (res.ok) {
           const data = await res.json();
           setPostComments((prev) => ({ ...prev, [postId]: data }));
@@ -155,7 +175,7 @@ export default function FeedClient({
 
     setIsSubmittingComment((prev) => ({ ...prev, [postId]: true }));
     try {
-      const res = await fetch("/api/comments", {
+      const res = await fetchWithRetry("/api/comments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId, content: text }),
@@ -176,6 +196,9 @@ export default function FeedClient({
             return p;
           })
         );
+
+        // Track comment created event
+        Analytics.trackClient("comment_created", { postId, commentId: newComment.id }).catch(() => {});
       }
     } catch (err) {
       console.error("Failed to add comment:", err);
@@ -211,7 +234,7 @@ export default function FeedClient({
       const url = cursorVal
         ? `/api/feed?limit=10&cursor=${cursorVal}`
         : `/api/feed?limit=10`;
-      const response = await fetch(url);
+      const response = await fetchWithRetry(url);
       if (response.ok) {
         const data = await response.json();
         const incomingPosts = data.posts || [];
@@ -222,6 +245,10 @@ export default function FeedClient({
         } else {
           setPosts(incomingPosts);
         }
+        incomingPosts.forEach((p: Post) => {
+          setLikedPosts((prev) => ({ ...prev, [p.id]: !!p.likes && p.likes.length > 0 }));
+          setBookmarkedPosts((prev) => ({ ...prev, [p.id]: !!p.bookmarks && p.bookmarks.length > 0 }));
+        });
         setNextCursor(next);
         setHasMore(!!next);
       } else {
@@ -239,7 +266,7 @@ export default function FeedClient({
 
   const fetchSuggestions = async () => {
     try {
-      const res = await fetch("/api/explore");
+      const res = await fetchWithRetry("/api/explore");
       if (res.ok) {
         const data = await res.json();
         if (data.creators) {
@@ -254,7 +281,7 @@ export default function FeedClient({
 
   const fetchFollowings = async () => {
     try {
-      const res = await fetch("/api/users/me");
+      const res = await fetchWithRetry("/api/users/me");
       if (res.ok) {
         const data = await res.json();
         if (data.following) {
@@ -289,12 +316,15 @@ export default function FeedClient({
   );
 
   useEffect(() => {
-    // Populate likes status from initial server posts
+    // Populate likes status and bookmarks status from initial server posts
     const initialLikes: Record<string, boolean> = {};
+    const initialBookmarks: Record<string, boolean> = {};
     initialPosts.forEach((p) => {
       initialLikes[p.id] = !!p.likes && p.likes.length > 0;
+      initialBookmarks[p.id] = !!p.bookmarks && p.bookmarks.length > 0;
     });
     setLikedPosts(initialLikes);
+    setBookmarkedPosts(initialBookmarks);
 
     fetchSuggestions();
     fetchFollowings();
@@ -303,21 +333,30 @@ export default function FeedClient({
   const handleToggleFollow = async (creatorId: string) => {
     const isFollowing = followingMap[creatorId];
     setFollowingMap((prev) => ({ ...prev, [creatorId]: !isFollowing }));
+
+    // Track client follow/unfollow event
+    if (!isFollowing) {
+      Analytics.trackClient("follow_created", { followedUserId: creatorId }).catch(() => {});
+    } else {
+      Analytics.trackClient("unfollow_created", { unfollowedUserId: creatorId }).catch(() => {});
+    }
+
     try {
-      await fetch("/api/users/follow", {
+      await fetchWithRetry("/api/users/follow", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ followingId: creatorId }),
       });
     } catch (error) {
       console.error("Failed to sync follow:", error);
+      setFollowingMap((prev) => ({ ...prev, [creatorId]: isFollowing }));
     }
   };
 
   // ─── OPTIMISTIC POST RENDERING ───
   const handlePublishPost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim() || isPublishing) return;
+    if (!inputText.trim() || isPublishing || isOffline) return;
 
     const tempPostId = `optimistic-${Date.now()}`;
     const optimisticPost: Post = {
@@ -352,7 +391,7 @@ export default function FeedClient({
     setPublishError(null);
 
     try {
-      const response = await fetch("/api/posts", {
+      const response = await fetchWithRetry("/api/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caption: optimisticPost.caption, imageUrl: optimisticPost.media?.[0]?.url }),
@@ -373,6 +412,9 @@ export default function FeedClient({
         };
         // Replace temp post with returned model
         setPosts((prev) => prev.map((p) => (p.id === tempPostId ? postWithAuthor : p)));
+
+        // Track post created event
+        Analytics.trackClient("post_created", { postId: newPost.id }).catch(() => {});
       } else {
         // Rollback optimistic element
         setPosts((prev) => prev.filter((p) => p.id !== tempPostId));
@@ -401,13 +443,44 @@ export default function FeedClient({
       })
     );
     try {
-      await fetch("/api/likes", {
+      const res = await fetchWithRetry("/api/likes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId }),
+      });
+      if (res.ok) {
+        if (!isLiked || forceLikeOnly) {
+          Analytics.trackClient("post_liked", { postId }).catch(() => {});
+        } else {
+          Analytics.trackClient("post_unliked", { postId }).catch(() => {});
+        }
+      }
+    } catch (error) {
+      console.error("Failed to sync like:", error);
+    }
+  };
+
+  const handleToggleBookmark = async (postId: string) => {
+    const isBookmarked = bookmarkedPosts[postId];
+    setBookmarkedPosts((prev) => ({ ...prev, [postId]: !isBookmarked }));
+
+    // Track client bookmark event
+    if (!isBookmarked) {
+      Analytics.trackClient("bookmark_created", { postId }).catch(() => {});
+    } else {
+      Analytics.trackClient("bookmark_removed", { postId }).catch(() => {});
+    }
+
+    try {
+      await fetchWithRetry("/api/bookmarks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ postId }),
       });
     } catch (error) {
-      console.error("Failed to sync like:", error);
+      console.error("Failed to sync bookmark:", error);
+      // Revert on error
+      setBookmarkedPosts((prev) => ({ ...prev, [postId]: isBookmarked }));
     }
   };
 
@@ -442,10 +515,17 @@ export default function FeedClient({
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onFocus={() => setIsComposerFocused(true)}
-                placeholder="What's on your mind? #creator #genz"
+                placeholder={isOffline ? "You are offline. Posting is disabled." : "What's on your mind? #creator #genz"}
                 className="w-full min-h-[72px] p-4 rounded-2xl bg-background-elevated/50 border border-white/8 text-white placeholder-text-faint focus:outline-none focus:border-primary/40 resize-none transition-all duration-300 text-sm leading-relaxed input-glow"
                 required
+                disabled={isOffline || isPublishing}
               />
+              {isOffline && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-500 text-xs font-semibold flex items-center gap-2 animate-in fade-in duration-200">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 animate-pulse" />
+                  <span>You are offline. Posting is temporarily disabled.</span>
+                </div>
+              )}
               {publishError && (
                 <div className="p-3.5 rounded-2xl bg-accent-rose/10 border border-accent-rose/25 text-accent-rose text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -515,7 +595,7 @@ export default function FeedClient({
                       </button>
                       <button
                         type="submit"
-                        disabled={isPublishing}
+                        disabled={isPublishing || isOffline}
                         className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs disabled:opacity-50 transition-all shadow-glow-sm flex items-center gap-1.5"
                       >
                         {isPublishing ? "Posting..." : <><span>Publish</span> <Send className="w-3 h-3" /></>}
@@ -555,7 +635,7 @@ export default function FeedClient({
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    disabled={isPublishing}
+                    disabled={isPublishing || isOffline}
                     className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs disabled:opacity-50 transition-all"
                   >
                     {isPublishing ? "Posting..." : "Post"}
@@ -598,6 +678,7 @@ export default function FeedClient({
             <AnimatePresence initial={false}>
               {posts.map((post, index) => {
                 const isLiked = likedPosts[post.id];
+                const isBookmarked = bookmarkedPosts[post.id];
                 const hasPoppedHeart = activeHearts[post.id];
                 return (
                   <motion.div
@@ -708,6 +789,13 @@ export default function FeedClient({
                           <span className="text-xs">{post._count.comments}</span>
                         </button>
                         <button
+                          onClick={() => handleToggleBookmark(post.id)}
+                          className={`flex items-center gap-1.5 transition-all group/btn ${isBookmarked ? "text-accent font-semibold" : "hover:text-accent"}`}
+                          title="Save post"
+                        >
+                          <BookmarkIcon className={`w-4.5 h-4.5 transition-transform duration-200 group-hover/btn:scale-110 ${isBookmarked ? "fill-accent stroke-accent" : ""}`} />
+                        </button>
+                        <button
                           onClick={() => handleSharePost(post.id)}
                           className={`flex items-center gap-1.5 hover:text-accent-cyan transition-colors ml-auto group/btn ${copiedPostId === post.id ? "text-accent" : ""}`}
                         >
@@ -755,12 +843,13 @@ export default function FeedClient({
                             type="text"
                             value={commentInputs[post.id] || ""}
                             onChange={(e) => setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))}
-                            placeholder="Add a comment..."
+                            placeholder={isOffline ? "Offline..." : "Add a comment..."}
                             className="flex-1 bg-white/3 border border-white/10 rounded-2xl px-4 py-2 text-xs text-white placeholder-text-faint focus:outline-none focus:border-primary/50 transition-colors"
+                            disabled={isOffline || isSubmittingComment[post.id]}
                           />
                           <button
                             type="submit"
-                            disabled={!(commentInputs[post.id] || "").trim() || isSubmittingComment[post.id]}
+                            disabled={isOffline || !(commentInputs[post.id] || "").trim() || isSubmittingComment[post.id]}
                             className="px-4 py-2 bg-primary hover:bg-primary-hover disabled:opacity-50 text-white rounded-2xl text-xs font-bold transition-all shadow-glow-sm"
                           >
                             {isSubmittingComment[post.id] ? "..." : "Post"}
@@ -774,11 +863,19 @@ export default function FeedClient({
             </AnimatePresence>
 
             {posts.length === 0 && !isFeedLoading && (
-              <div className="text-center py-20 glass-card rounded-3xl flex flex-col items-center gap-4">
-                <AlertCircle className="w-10 h-10 text-text-faint" />
-                <div>
-                  <p className="text-text-secondary text-sm font-semibold">Your feed is empty</p>
-                  <p className="text-text-muted text-xs mt-1">Write your first post above or follow some creators!</p>
+              <div className="text-center py-20 glass-card rounded-3xl flex flex-col items-center gap-4 text-text-muted">
+                <Sparkles className="w-12 h-12 text-primary animate-pulse" />
+                <div className="space-y-2">
+                  <p className="text-text-secondary text-sm font-semibold text-white">Your feed is empty</p>
+                  <p className="text-text-muted text-xs max-w-xs mx-auto">
+                    Write your first post above or find other creators to follow in the Explore tab.
+                  </p>
+                  <button
+                    onClick={() => window.location.href = "/explore"}
+                    className="mt-4 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs shadow-glow-sm transition-all"
+                  >
+                    Find People to Follow
+                  </button>
                 </div>
               </div>
             )}
@@ -881,7 +978,7 @@ export default function FeedClient({
                   setReportSuccess(false);
 
                   try {
-                    const res = await fetch("/api/posts/report", {
+                    const res = await fetchWithRetry("/api/posts/report", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ postId: reportingPostId, reason: reportReason }),
@@ -889,6 +986,7 @@ export default function FeedClient({
 
                     if (res.ok) {
                       setReportSuccess(true);
+                      Analytics.trackClient("post_reported", { postId: reportingPostId, reason: reportReason }).catch(() => {});
                       setTimeout(() => {
                         setReportingPostId(null);
                         setReportReason("");

@@ -24,6 +24,8 @@ export async function GET() {
             displayName: true,
             avatarUrl: true,
             bio: true,
+            website: true,
+            isPrivate: true,
             isVerified: true,
             followerCount: true,
             followingCount: true,

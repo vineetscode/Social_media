@@ -23,6 +23,8 @@ import {
 import { getOptimizedMediaUrl } from "@/lib/media-optimize";
 import { useAppStore } from "@/store";
 import { getSocket } from "@/lib/socket";
+import { fetchWithRetry } from "@/lib/api-client";
+import { useToastStore } from "@/store/toast";
 
 interface UserMe {
   id: string;
@@ -73,7 +75,7 @@ export default function NavigationShell({
 
   const fetchUserMe = useCallback(async () => {
     try {
-      const res = await fetch("/api/users/me");
+      const res = await fetchWithRetry("/api/users/me");
       if (res.ok) {
         const data = await res.json();
         setUserMe(data);
@@ -83,7 +85,7 @@ export default function NavigationShell({
 
   const fetchUnreadCounts = useCallback(async () => {
     try {
-      const res = await fetch("/api/unread-counts");
+      const res = await fetchWithRetry("/api/unread-counts");
       if (res.ok) {
         const data = await res.json();
         setCounts(data.unreadNotifications || 0, data.unreadMessages || 0);
@@ -101,12 +103,46 @@ export default function NavigationShell({
     }
   }, [isLoaded, user, fetchUserMe, fetchUnreadCounts, countsLoaded]);
 
-  // Real-time WebSockets setup for unread updates instead of periodic polling
+  // Online/Offline network listeners
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleOnline = () => {
+      useToastStore.getState().addToast("You are back online!", "success");
+    };
+
+    const handleOffline = () => {
+      useToastStore.getState().addToast("Connection lost. Running in offline mode.", "warning");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Real-time WebSockets setup for unread updates and online presence tracking
   useEffect(() => {
     if (isLoaded && user) {
       const socket = getSocket(user.id);
       socket.connect();
-      socket.emit("join_room", { userId: user.id });
+
+      const joinRoom = () => {
+        console.log("[SOCKET CONNECT] Re-joining room...");
+        socket.emit("join_room", { userId: user.id });
+      };
+
+      // Ensure joining room on connect (and reconnect)
+      socket.on("connect", joinRoom);
+      joinRoom(); // Call once initially
+
+      // Track online users list
+      socket.on("online_users", (users: string[]) => {
+        useAppStore.getState().setOnlineUsers(users);
+      });
 
       socket.on("new_message", (message: any) => {
         // Increment unread messages if not actively chatting with the sender
@@ -115,17 +151,31 @@ export default function NavigationShell({
           useAppStore.setState((prev) => ({
             unreadMessagesCount: prev.unreadMessagesCount + 1,
           }));
+
+          // Push toast notification for the new message
+          useToastStore.getState().addToast(
+            `New message from ${message.senderName || "User"}: ${message.content}`,
+            "info"
+          );
         }
       });
 
-      socket.on("new_notification", () => {
+      socket.on("new_notification", (notification: any) => {
         // Increment unread notifications
         useAppStore.setState((prev) => ({
           unreadNotificationsCount: prev.unreadNotificationsCount + 1,
         }));
+
+        // Push toast notification
+        useToastStore.getState().addToast(
+          notification?.message || "You received a new notification!",
+          "info"
+        );
       });
 
       return () => {
+        socket.off("connect", joinRoom);
+        socket.off("online_users");
         socket.off("new_message");
         socket.off("new_notification");
         socket.disconnect();

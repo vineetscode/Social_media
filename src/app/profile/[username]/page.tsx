@@ -3,6 +3,52 @@ import prisma from "@/lib/prisma";
 import { UserService } from "@/modules/user/services/user.service";
 import ProfileClient from "./profile-client";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
+
+export async function generateMetadata({
+  params: paramsPromise,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const params = await paramsPromise;
+  const targetUsername = decodeURIComponent(params.username);
+  const profile = await UserService.getUserProfile(targetUsername);
+
+  if (!profile) {
+    return {
+      title: "User Not Found | JabWeMet",
+    };
+  }
+
+  const title = `${profile.displayName} (@${profile.username}) | JabWeMet`;
+  const description = profile.bio || `Check out ${profile.displayName}'s profile on JabWeMet.`;
+  const imageUrl = profile.avatarUrl || "/logo.jpg";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      username: profile.username,
+      images: [
+        {
+          url: imageUrl,
+          width: 800,
+          height: 800,
+          alt: profile.displayName,
+        },
+      ],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [imageUrl],
+    },
+  };
+}
 
 export default async function ProfilePage({
   params: paramsPromise,
