@@ -23,31 +23,31 @@ export default async function ProfilePage({
     notFound();
   }
 
-  // Fetch all posts by this profile author
-  const posts = await prisma.post.findMany({
-    where: { authorId: profile.userId },
-    orderBy: { createdAt: "desc" },
-    include: {
-      media: true,
-      _count: {
-        select: { likes: true, comments: true },
-      },
-    },
-  });
-
-  // Check if current user is following the target profile
-  let isFollowing = false;
-  if (currentUserId !== profile.userId) {
-    const follow = await prisma.follower.findUnique({
-      where: {
-        followerId_followingId: {
-          followerId: currentUserId,
-          followingId: profile.userId,
+  // Fetch posts and follow relationship in parallel to reduce sequential database round-trips
+  const [posts, follow] = await Promise.all([
+    prisma.post.findMany({
+      where: { authorId: profile.userId },
+      orderBy: { createdAt: "desc" },
+      include: {
+        media: true,
+        _count: {
+          select: { likes: true, comments: true },
         },
       },
-    });
-    isFollowing = !!follow;
-  }
+    }),
+    currentUserId !== profile.userId
+      ? prisma.follower.findUnique({
+          where: {
+            followerId_followingId: {
+              followerId: currentUserId,
+              followingId: profile.userId,
+            },
+          },
+        })
+      : Promise.resolve(null),
+  ]);
+
+  const isFollowing = !!follow;
 
   // Serialize objects for safely passing down to Client Component
   const serializedProfile = {

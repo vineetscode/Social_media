@@ -7,57 +7,89 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ username: string }> }
 ) {
+  const startTotal = performance.now();
+  let startQuery = 0;
+  let endQuery = 0;
+  let startAuth = 0;
+  let endAuth = 0;
+  let queryCount = 0;
+
   try {
+    startAuth = performance.now();
     const { userId: currentUserId } = await auth();
     if (!currentUserId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    endAuth = performance.now();
 
     const { username } = await params;
     if (!username) {
       return NextResponse.json({ error: "Username is required" }, { status: 400 });
     }
 
+    startQuery = performance.now();
     // Fetch the profile
     const profile = await UserService.getUserProfile(username);
+    queryCount += 1;
     if (!profile) {
+      endQuery = performance.now();
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Fetch all posts by this profile author
-    const posts = await prisma.post.findMany({
-      where: { authorId: profile.userId },
-      orderBy: { createdAt: "desc" },
-      include: {
-        media: true,
-        _count: {
-          select: { likes: true, comments: true },
-        },
-      },
-    });
-
-    // Check if the current user follows this profile
-    let isFollowing = false;
-    if (currentUserId !== profile.userId) {
-      const follow = await prisma.follower.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: currentUserId,
-            followingId: profile.userId,
+    // Fetch posts and check following status in parallel to reduce sequential DB round-trips
+    const [posts, follow] = await Promise.all([
+      prisma.post.findMany({
+        where: { authorId: profile.userId },
+        orderBy: { createdAt: "desc" },
+        include: {
+          media: true,
+          _count: {
+            select: { likes: true, comments: true },
           },
         },
-      });
-      isFollowing = !!follow;
-    }
+      }),
+      currentUserId !== profile.userId
+        ? prisma.follower.findUnique({
+            where: {
+              followerId_followingId: {
+                followerId: currentUserId,
+                followingId: profile.userId,
+              },
+            },
+          })
+        : Promise.resolve(null),
+    ]);
 
-    return NextResponse.json({
+    const isFollowing = !!follow;
+    queryCount += 2;
+    endQuery = performance.now();
+
+    const startSerialization = performance.now();
+    const payload = {
       profile,
       posts,
       isFollowing,
       isSelf: currentUserId === profile.userId,
+    };
+    const responseBody = JSON.stringify(payload);
+    const endSerialization = performance.now();
+
+    const endTotal = performance.now();
+
+    console.log(
+      `[PERF LOG] GET /api/users/profile/${username} | ` +
+      `Total: ${(endTotal - startTotal).toFixed(2)}ms | ` +
+      `Auth: ${(endAuth - startAuth).toFixed(2)}ms | ` +
+      `Query: ${(endQuery - startQuery).toFixed(2)}ms (count: ${queryCount}) | ` +
+      `Serialization: ${(endSerialization - startSerialization).toFixed(2)}ms`
+    );
+
+    return new NextResponse(responseBody, {
+      headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    console.error("[GET Profile Error]", error);
+    const endTotal = performance.now();
+    console.error(`[PERF LOG ERROR] GET /api/users/profile | Total: ${(endTotal - startTotal).toFixed(2)}ms |`, error);
     return NextResponse.json({ error: error.message || "Failed to load profile" }, { status: 500 });
   }
 }
