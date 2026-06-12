@@ -2,9 +2,29 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { SignedIn, SignedOut, UserButton, SignIn, SignUp } from "@clerk/nextjs";
+import Image from "next/image";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
-import { Zap, MessageSquare, Shield, ArrowRight, Sparkles, X } from "lucide-react";
+import { Zap, MessageSquare, Shield, ArrowRight, Sparkles, X, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+
+const SignIn = dynamic(() => import("@clerk/nextjs").then((mod) => mod.SignIn), {
+  ssr: false,
+  loading: () => (
+    <div className="h-96 flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  ),
+});
+
+const SignUp = dynamic(() => import("@clerk/nextjs").then((mod) => mod.SignUp), {
+  ssr: false,
+  loading: () => (
+    <div className="h-96 flex items-center justify-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  ),
+});
 
 export default function Home() {
   const [authMode, setAuthMode] = useState<"sign-in" | "sign-up" | null>(null);
@@ -67,13 +87,20 @@ export default function Home() {
         className="w-full max-w-5xl flex justify-between items-center z-10 py-4 px-6 border border-white/5 glass-panel rounded-2xl shadow-glass"
       >
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-glow-sm">
-            <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-glow-sm relative">
+            <Image
+              src="/logo.jpg"
+              alt="Logo"
+              fill
+              sizes="32px"
+              className="object-cover"
+              priority
+            />
           </div>
           <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-primary to-primary-neon bg-clip-text text-transparent tracking-tight">
             JabWeMet
           </span>
-          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/20 font-bold uppercase tracking-widest hidden sm:inline-block">
+          <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/20 text-primary-glow border border-primary/20 font-bold uppercase tracking-widest hidden sm:inline-block">
             MVP
           </span>
         </div>
@@ -115,7 +142,7 @@ export default function Home() {
       >
         <motion.div
           variants={itemVariants}
-          className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-primary-neon font-semibold uppercase tracking-wider"
+          className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-primary-glow font-semibold uppercase tracking-wider"
         >
           <Sparkles className="w-3.5 h-3.5" /> Next-gen social ecosystem
         </motion.div>
@@ -188,10 +215,10 @@ export default function Home() {
           onClick={() => setAuthMode("sign-in")}
           className="p-6 rounded-2xl bg-background-card border border-white/5 shadow-glass glass-panel transition-all group duration-300 flex flex-col items-start cursor-pointer"
         >
-          <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform duration-300">
+          <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center text-primary-glow mb-4 group-hover:scale-110 transition-transform duration-300">
             <Zap className="w-5 h-5" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2 group-hover:text-primary transition-colors">Instant Media</h3>
+          <h2 className="text-lg font-bold text-white mb-2 group-hover:text-primary-glow transition-colors">Instant Media</h2>
           <p className="text-text-secondary text-sm leading-relaxed">
             Record reels, upload multi-image carousels, and log daily stories directly from mobile devices.
           </p>
@@ -206,7 +233,7 @@ export default function Home() {
           <div className="w-12 h-12 rounded-xl bg-accent/15 flex items-center justify-center text-accent mb-4 group-hover:scale-110 transition-transform duration-300">
             <MessageSquare className="w-5 h-5" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2 group-hover:text-accent transition-colors">Real-Time Streams</h3>
+          <h2 className="text-lg font-bold text-white mb-2 group-hover:text-accent transition-colors">Real-Time Streams</h2>
           <p className="text-text-secondary text-sm leading-relaxed">
             Instant websocket text messages, typing indicator updates, and immediate read status receipts.
           </p>
@@ -218,10 +245,10 @@ export default function Home() {
           onClick={() => setAuthMode("sign-in")}
           className="p-6 rounded-2xl bg-background-card border border-white/5 shadow-glass glass-panel transition-all group duration-300 flex flex-col items-start cursor-pointer"
         >
-          <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center text-primary-neon mb-4 group-hover:scale-110 transition-transform duration-300">
+          <div className="w-12 h-12 rounded-xl bg-primary/15 flex items-center justify-center text-violet-400 mb-4 group-hover:scale-110 transition-transform duration-300">
             <Shield className="w-5 h-5" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2 group-hover:text-primary-neon transition-colors">Safe Networks</h3>
+          <h2 className="text-lg font-bold text-white mb-2 group-hover:text-violet-400 transition-colors">Safe Networks</h2>
           <p className="text-text-secondary text-sm leading-relaxed">
             JWT session cookies, double-submit CSRF, and strict Follow/Block privacy graph configurations.
           </p>

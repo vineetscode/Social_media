@@ -220,6 +220,7 @@ export default function ReelsPage() {
 
   return (
     <NavigationShell fullBleed>
+      <h1 className="sr-only">Reels | JabWeMet</h1>
       {/* fullBleed mode: no bottom dock padding, full-height scroll */}
       <div className="flex flex-col h-screen">
         {/* Post Reel button — floating top right */}
@@ -359,7 +360,7 @@ export default function ReelsPage() {
                 <X className="w-5 h-5" />
               </button>
               <div>
-                <h3 className="text-lg font-black text-white flex items-center gap-2"><Tv className="w-5 h-5 text-accent" /> Post a Reel</h3>
+                <h2 className="text-lg font-black text-white flex items-center gap-2"><Tv className="w-5 h-5 text-accent" /> Post a Reel</h2>
                 <p className="text-xs text-text-muted mt-0.5">Share a looping short video with your followers.</p>
               </div>
               <form onSubmit={handlePublishReel} className="space-y-4">
@@ -404,7 +405,7 @@ export default function ReelsPage() {
               <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-4" />
 
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
-                <h3 className="text-sm font-bold text-white">Comments</h3>
+                <h2 className="text-sm font-bold text-white">Comments</h2>
                 <button onClick={() => setActiveCommentReelId(null)} className="p-1.5 rounded-xl hover:bg-white/5 text-text-muted hover:text-white">
                   <X className="w-4 h-4" />
                 </button>
@@ -480,9 +481,9 @@ export default function ReelsPage() {
               </button>
 
               <div>
-                <h3 className="text-lg font-black text-white flex items-center gap-2">
+                <h2 className="text-lg font-black text-white flex items-center gap-2">
                   <Flag className="w-5 h-5 text-red-400" /> Report Reel
-                </h3>
+                </h2>
                 <p className="text-xs text-text-muted mt-0.5">Let us know what's wrong. We review reports confidentially.</p>
               </div>
 

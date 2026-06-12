@@ -125,21 +125,35 @@ body {
 }
 
 /* =============================================
-   BORDER GLOW PULSE
+   BORDER GLOW PULSE (Composited via Opacity)
    ============================================= */
-@keyframes border-flow {
+@keyframes border-glow-pulse {
   0%, 100% {
-    border-color: rgba(99, 102, 241, 0.12);
-    box-shadow: none;
+    opacity: 0.25;
   }
   50% {
-    border-color: rgba(139, 92, 246, 0.35);
-    box-shadow: 0 0 20px rgba(99, 102, 241, 0.08);
+    opacity: 0.85;
   }
 }
 
 .animate-border-flow {
-  animation: border-flow 5s infinite ease-in-out;
+  position: relative;
+}
+
+.animate-border-flow::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(139, 92, 246, 0.55));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.4;
+  animation: border-glow-pulse 4s infinite ease-in-out;
+  z-index: 1;
 }
 
 /* =============================================

@@ -312,20 +312,21 @@ export default function FeedPage() {
 
   if (!isLoaded || !user) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+      <main className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center">
           <Loader2 className="w-5 h-5 text-primary animate-spin" />
         </div>
         <span className="text-xs font-semibold tracking-widest uppercase text-text-muted">
           Loading your feed...
         </span>
-      </div>
+      </main>
     );
   }
 
   return (
     <NavigationShell>
       <div className="flex flex-col lg:flex-row max-w-5xl mx-auto w-full py-6 px-4 md:px-6 md:py-8 gap-8">
+        <h1 className="sr-only">Feed | JabWeMet</h1>
         {/* Main Feed Column */}
         <div className="flex-1 space-y-5 min-w-0">
 
@@ -670,9 +671,9 @@ export default function FeedPage() {
         {/* Right Sidebar — Desktop only */}
         <div className="hidden lg:block w-72 space-y-5 flex-shrink-0">
           <div className="glass-card rounded-3xl p-5 space-y-4 sticky top-8">
-            <h3 className="section-label flex items-center gap-2">
+            <h2 className="section-label flex items-center gap-2">
               <TrendingUp className="w-3.5 h-3.5 text-accent" /> Creators for you
-            </h3>
+            </h2>
             {suggestedCreators.length === 0 ? (
               <p className="text-xs text-text-muted italic">No suggestions available.</p>
             ) : (
@@ -740,9 +741,9 @@ export default function FeedPage() {
 
               {/* Modal Title */}
               <div>
-                <h3 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
+                <h2 className="text-lg font-black text-white tracking-tight flex items-center gap-2">
                   <Flag className="w-5 h-5 text-red-400" /> Report Content
-                </h3>
+                </h2>
                 <p className="text-xs text-text-muted">Help us keep JabWeMet clean and safe.</p>
               </div>
 

@@ -123,6 +123,7 @@ export default function ChatPage() {
 
   return (
     <NavigationShell fullBleed>
+      <h1 className="sr-only">Messages | JabWeMet</h1>
       <div className="flex h-screen pt-[57px] md:pt-0">
 
         {/* ─── INBOX SIDEBAR ─── */}
@@ -203,7 +204,7 @@ export default function ChatPage() {
                     {activeRecipient.displayName.substring(0, 1).toUpperCase()}
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-white">{activeRecipient.displayName}</h3>
+                    <h2 className="text-sm font-bold text-white">{activeRecipient.displayName}</h2>
                     <span className="text-[10px] text-accent font-semibold tracking-wider uppercase">● Online</span>
                   </div>
                 </div>
@@ -290,7 +291,7 @@ export default function ChatPage() {
                   <MessageSquare className="w-10 h-10" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-black text-white tracking-tight">Select a conversation</h3>
+                  <h2 className="text-lg font-black text-white tracking-tight">Select a conversation</h2>
                   <p className="text-sm text-text-muted mt-1.5 leading-relaxed max-w-xs">
                     Choose from your contacts on the left to start chatting in real-time.
                   </p>

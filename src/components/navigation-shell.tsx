@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useUser, UserButton } from "@clerk/nextjs";
 import { motion, AnimatePresence } from "framer-motion";
@@ -135,8 +136,15 @@ export default function NavigationShell({
             className="flex items-center gap-3 group"
           >
             {/* Logo icon */}
-            <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 shadow-glow-sm group-hover:shadow-glow-primary transition-shadow duration-300">
-              <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+            <div className="w-8 h-8 rounded-xl overflow-hidden flex-shrink-0 shadow-glow-sm group-hover:shadow-glow-primary transition-shadow duration-300 relative">
+              <Image
+                src="/logo.jpg"
+                alt="Logo"
+                fill
+                sizes="32px"
+                className="object-cover"
+                priority
+              />
             </div>
             <span className="hidden lg:block text-lg font-black gradient-text truncate tracking-tight">
               JabWeMet
@@ -221,6 +229,7 @@ export default function NavigationShell({
                   src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 80)}
                   alt="Profile"
                   className="w-full h-full object-cover"
+                  loading="lazy"
                 />
               ) : (
                 <User className="w-4 h-4 text-text-muted" />
@@ -250,8 +259,15 @@ export default function NavigationShell({
           aria-expanded={drawerOpen}
           aria-haspopup="dialog"
         >
-          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-glow-sm">
-            <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+          <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center shadow-glow-sm relative">
+            <Image
+              src="/logo.jpg"
+              alt="Logo"
+              fill
+              sizes="32px"
+              className="object-cover"
+              priority
+            />
           </div>
           <span className="text-base font-black gradient-text tracking-tight">
             JabWeMet
@@ -269,6 +285,7 @@ export default function NavigationShell({
                 src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 80)}
                 alt="Profile"
                 className="w-full h-full object-cover"
+                loading="lazy"
               />
             ) : (
               <User className="w-4 h-4 text-text-muted" />
@@ -304,8 +321,15 @@ export default function NavigationShell({
               {/* Drawer Header */}
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/5">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center">
-                    <img src="/logo.jpg" alt="Logo" className="w-full h-full object-cover" />
+                  <div className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center relative">
+                    <Image
+                      src="/logo.jpg"
+                      alt="Logo"
+                      fill
+                      sizes="32px"
+                      className="object-cover"
+                      priority
+                    />
                   </div>
                   <span className="text-lg font-black gradient-text tracking-tight">
                     JabWeMet
@@ -332,6 +356,7 @@ export default function NavigationShell({
                         src={getOptimizedMediaUrl(userMe?.profile?.avatarUrl || user?.imageUrl, 90)}
                         alt="Profile"
                         className="w-full h-full object-cover"
+                        loading="lazy"
                       />
                     ) : (
                       <User className="w-4 h-4 text-text-muted" />
