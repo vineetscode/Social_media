@@ -1,13 +1,24 @@
 import { currentUser } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
 
+// In-memory cache to store already verified userIds.
+// This prevents running database queries on every authenticated API endpoint request.
+const syncedUsersCache = new Set<string>();
+
 export async function syncUserWithDb(userId: string) {
+  if (syncedUsersCache.has(userId)) {
+    return true;
+  }
+
   // Check if user exists in database
   const existingUser = await prisma.user.findUnique({
     where: { id: userId },
   });
 
-  if (existingUser) return existingUser;
+  if (existingUser) {
+    syncedUsersCache.add(userId);
+    return existingUser;
+  }
 
   // Otherwise, fetch user details from Clerk
   const clerkUser = await currentUser();
@@ -46,6 +57,7 @@ export async function syncUserWithDb(userId: string) {
       },
     });
 
+    syncedUsersCache.add(userId);
     return user;
   });
 }

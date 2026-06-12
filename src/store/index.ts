@@ -20,10 +20,14 @@ interface JabWeMetState {
   onlineUsers: string[]; // List of userIds online
   setOnlineUsers: (users: string[]) => void;
 
-  // Notifications State
+  // Notifications & Messages Counts
   unreadNotificationsCount: number;
+  unreadMessagesCount: number;
+  countsLoaded: boolean;
+  setCounts: (notifications: number, messages: number) => void;
   incrementUnreadCount: () => void;
   resetUnreadCount: () => void;
+  setUnreadMessagesCount: (count: number) => void;
 }
 
 export const useAppStore = create<JabWeMetState>((set) => ({
@@ -37,6 +41,11 @@ export const useAppStore = create<JabWeMetState>((set) => ({
   setOnlineUsers: (onlineUsers) => set({ onlineUsers }),
 
   unreadNotificationsCount: 0,
+  unreadMessagesCount: 0,
+  countsLoaded: false,
+  setCounts: (unreadNotificationsCount, unreadMessagesCount) =>
+    set({ unreadNotificationsCount, unreadMessagesCount, countsLoaded: true }),
   incrementUnreadCount: () => set((state) => ({ unreadNotificationsCount: state.unreadNotificationsCount + 1 })),
   resetUnreadCount: () => set({ unreadNotificationsCount: 0 }),
+  setUnreadMessagesCount: (unreadMessagesCount) => set({ unreadMessagesCount }),
 }));

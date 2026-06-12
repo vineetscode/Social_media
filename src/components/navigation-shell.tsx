@@ -21,6 +21,8 @@ import {
   User,
 } from "lucide-react";
 import { getOptimizedMediaUrl } from "@/lib/media-optimize";
+import { useAppStore } from "@/store";
+import { getSocket } from "@/lib/socket";
 
 interface UserMe {
   id: string;
@@ -61,8 +63,13 @@ export default function NavigationShell({
   const pathname = usePathname();
   const [userMe, setUserMe] = useState<UserMe | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [unreadMessages, setUnreadMessages] = useState(0);
+
+  const {
+    unreadNotificationsCount,
+    unreadMessagesCount,
+    countsLoaded,
+    setCounts,
+  } = useAppStore();
 
   const fetchUserMe = useCallback(async () => {
     try {
@@ -79,22 +86,52 @@ export default function NavigationShell({
       const res = await fetch("/api/unread-counts");
       if (res.ok) {
         const data = await res.json();
-        setUnreadNotifications(data.unreadNotifications || 0);
-        setUnreadMessages(data.unreadMessages || 0);
+        setCounts(data.unreadNotifications || 0, data.unreadMessages || 0);
       }
     } catch (_) {}
-  }, []);
+  }, [setCounts]);
 
+  // Fetch initial counts ONCE when component mounts
   useEffect(() => {
     if (isLoaded && user) {
       fetchUserMe();
-      fetchUnreadCounts();
-
-      // Poll unread counts every 10 seconds
-      const interval = setInterval(fetchUnreadCounts, 10000);
-      return () => clearInterval(interval);
+      if (!countsLoaded) {
+        fetchUnreadCounts();
+      }
     }
-  }, [isLoaded, user, fetchUserMe, fetchUnreadCounts, pathname]);
+  }, [isLoaded, user, fetchUserMe, fetchUnreadCounts, countsLoaded]);
+
+  // Real-time WebSockets setup for unread updates instead of periodic polling
+  useEffect(() => {
+    if (isLoaded && user) {
+      const socket = getSocket(user.id);
+      socket.connect();
+      socket.emit("join_room", { userId: user.id });
+
+      socket.on("new_message", (message: any) => {
+        // Increment unread messages if not actively chatting with the sender
+        const currentStore = useAppStore.getState();
+        if (currentStore.activeRoomId !== message.senderId) {
+          useAppStore.setState((prev) => ({
+            unreadMessagesCount: prev.unreadMessagesCount + 1,
+          }));
+        }
+      });
+
+      socket.on("new_notification", () => {
+        // Increment unread notifications
+        useAppStore.setState((prev) => ({
+          unreadNotificationsCount: prev.unreadNotificationsCount + 1,
+        }));
+      });
+
+      return () => {
+        socket.off("new_message");
+        socket.off("new_notification");
+        socket.disconnect();
+      };
+    }
+  }, [isLoaded, user]);
 
   // Close drawer when navigating
   useEffect(() => {
@@ -173,14 +210,14 @@ export default function NavigationShell({
                       active ? "text-primary" : ""
                     }`}
                   />
-                  {label === "Notifications" && unreadNotifications > 0 && (
+                  {label === "Notifications" && unreadNotificationsCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
-                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                      {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
                     </span>
                   )}
-                  {label === "Messages" && unreadMessages > 0 && (
+                  {label === "Messages" && unreadMessagesCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
-                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                      {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
                     </span>
                   )}
                 </div>
@@ -393,14 +430,14 @@ export default function NavigationShell({
                         <Icon
                           className={`w-5 h-5 flex-shrink-0 ${active ? "text-primary" : ""}`}
                         />
-                        {label === "Notifications" && unreadNotifications > 0 && (
+                        {label === "Notifications" && unreadNotificationsCount > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
-                            {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                            {unreadNotificationsCount > 99 ? "99+" : unreadNotificationsCount}
                           </span>
                         )}
-                        {label === "Messages" && unreadMessages > 0 && (
+                        {label === "Messages" && unreadMessagesCount > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90">
-                            {unreadMessages > 99 ? "99+" : unreadMessages}
+                            {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
                           </span>
                         )}
                       </div>
@@ -478,9 +515,9 @@ export default function NavigationShell({
                         : "text-text-muted group-hover:text-text-secondary group-hover:scale-105"
                     }`}
                   />
-                  {label === "Chat" && unreadMessages > 0 && (
+                  {label === "Chat" && unreadMessagesCount > 0 && (
                     <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent-rose text-[9px] font-bold text-white shadow-[0_0_8px_rgba(244,63,94,0.5)] scale-90 z-20">
-                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                      {unreadMessagesCount > 99 ? "99+" : unreadMessagesCount}
                     </span>
                   )}
                 </div>

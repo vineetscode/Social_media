@@ -46,15 +46,19 @@ export class FeedService {
     });
   }
 
-  // 2. Ranked Feed Builder utilizing the gravity decay formula
-  static async getRankedFeed(userId: string, limit = 20) {
+  // 2. Ranked Feed Builder utilizing the gravity decay formula with cursor pagination
+  static async getRankedFeed(userId: string, limit = 20, cursor?: string) {
     const followingIds = await FollowService.getFollowingIds(userId);
     const filter = followingIds.length > 0 ? { authorId: { in: followingIds } } : {};
 
+    const candidateLimit = 30; // Fetch 30 candidates to rank in-memory instead of 100
+
     // Fetch candidate posts from the database first
-    const posts = await prisma.post.findMany({
+    const dbPosts = await prisma.post.findMany({
       where: filter,
-      take: 100, // Fetch candidates to rank in-memory
+      take: candidateLimit + 1,
+      skip: cursor ? 1 : 0,
+      cursor: cursor ? { id: cursor } : undefined,
       orderBy: { createdAt: "desc" },
       include: {
         author: {
@@ -88,6 +92,9 @@ export class FeedService {
       },
     });
 
+    const hasMore = dbPosts.length > candidateLimit;
+    const posts = hasMore ? dbPosts.slice(0, candidateLimit) : dbPosts;
+
     const now = new Date().getTime();
 
     // Score and sort using the gravity decay algorithm
@@ -118,8 +125,13 @@ export class FeedService {
     });
 
     // Sort descending by calculated score
-    return rankedPosts
-      .sort((a, b) => b.rankingScore - a.rankingScore)
-      .slice(0, limit);
+    const sortedPosts = rankedPosts.sort((a, b) => b.rankingScore - a.rankingScore);
+    const paginatedPosts = sortedPosts.slice(0, limit);
+    const nextCursor = dbPosts.length > 0 ? dbPosts[dbPosts.length - 1].id : null;
+
+    return {
+      posts: paginatedPosts,
+      nextCursor: hasMore ? nextCursor : null,
+    };
   }
 }

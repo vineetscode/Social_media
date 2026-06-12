@@ -14,10 +14,11 @@ export async function GET(request: Request) {
     await syncUserWithDb(userId);
 
     const { searchParams } = new URL(request.url);
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const cursor = searchParams.get("cursor") || undefined;
 
-    const posts = await FeedService.getRankedFeed(userId, limit);
-    return NextResponse.json(posts);
+    const result = await FeedService.getRankedFeed(userId, limit, cursor);
+    return NextResponse.json(result);
   } catch (error: any) {
     console.error("[GET /api/feed Error]", error);
     return NextResponse.json(
