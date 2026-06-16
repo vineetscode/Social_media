@@ -21,6 +21,7 @@ import {
   getOptimizedVideoUrl,
   getVideoThumbnailUrl,
 } from "@/lib/cloudinary";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limiting: max 5 uploads per minute
+  const limitCheck = await rateLimiter.rateLimit(`${userId}:uploads`, 60000, 5);
+  if (!limitCheck.success) {
+    return NextResponse.json(
+      { error: "Too Many Requests", message: "You are uploading media too fast. Please wait a moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+      }
+    );
+  }
+
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;
@@ -43,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Validate file ─────────────────────────────────────────────────────────
-    const validation = validateFile(file.type, file.size, "video");
+    const validation = validateFile(file.name, file.type, file.size, "video");
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 422 });
     }

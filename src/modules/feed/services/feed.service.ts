@@ -6,8 +6,38 @@ export class FeedService {
   static async getChronologicalFeed(userId: string, limit = 20, cursor?: string) {
     const followingIds = await FollowService.getFollowingIds(userId);
 
-    // If not following anyone, pull global public feed for discovery
-    const filter = followingIds.length > 0 ? { authorId: { in: followingIds } } : {};
+    // Fetch user block boundaries
+    const blocks = await prisma.block.findMany({
+      where: {
+        OR: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      },
+      select: { blockerId: true, blockedId: true }
+    });
+    const blockedUserIds = Array.from(new Set(
+      blocks.flatMap(b => [b.blockerId, b.blockedId])
+    )).filter(id => id !== userId);
+
+    // Filter out blocked users. Exclude private accounts for discovery mode
+    const filter = followingIds.length > 0
+      ? {
+          authorId: {
+            in: followingIds,
+            notIn: blockedUserIds,
+          },
+        }
+      : {
+          authorId: {
+            notIn: blockedUserIds,
+          },
+          author: {
+            profile: {
+              isPrivate: false,
+            },
+          },
+        };
 
     return prisma.post.findMany({
       where: filter,
@@ -58,7 +88,39 @@ export class FeedService {
   // 2. Ranked Feed Builder utilizing the gravity decay formula with cursor pagination
   static async getRankedFeed(userId: string, limit = 20, cursor?: string) {
     const followingIds = await FollowService.getFollowingIds(userId);
-    const filter = followingIds.length > 0 ? { authorId: { in: followingIds } } : {};
+
+    // Fetch user block boundaries
+    const blocks = await prisma.block.findMany({
+      where: {
+        OR: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      },
+      select: { blockerId: true, blockedId: true }
+    });
+    const blockedUserIds = Array.from(new Set(
+      blocks.flatMap(b => [b.blockerId, b.blockedId])
+    )).filter(id => id !== userId);
+
+    // Filter out blocked users. Exclude private accounts for discovery mode
+    const filter = followingIds.length > 0
+      ? {
+          authorId: {
+            in: followingIds,
+            notIn: blockedUserIds,
+          },
+        }
+      : {
+          authorId: {
+            notIn: blockedUserIds,
+          },
+          author: {
+            profile: {
+              isPrivate: false,
+            },
+          },
+        };
 
     const candidateLimit = 30; // Fetch 30 candidates to rank in-memory instead of 100
 

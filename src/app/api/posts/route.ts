@@ -2,12 +2,25 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { PostService } from "@/modules/post/services/post.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting: max 10 posts per minute
+    const limitCheck = await rateLimiter.rateLimit(`${userId}:posts`, 60000, 10);
+    if (!limitCheck.success) {
+      return NextResponse.json(
+        { error: "Too Many Requests", message: "You are posting too fast. Please wait before creating more posts." },
+        {
+          status: 429,
+          headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+        }
+      );
     }
 
     // Ensure user profile exists in database

@@ -12,10 +12,13 @@ export async function POST(request: Request) {
 
     await syncUserWithDb(userId);
 
-    const { postId, reelId, reason } = await request.json();
-    if ((!postId && !reelId) || !reason || !reason.trim()) {
-      return NextResponse.json({ error: "postId or reelId and reason are required" }, { status: 400 });
+    const { postId, reelId, commentId, category, reason } = await request.json();
+    if (!postId && !reelId && !commentId) {
+      return NextResponse.json({ error: "postId, reelId, or commentId is required" }, { status: 400 });
     }
+
+    const allowedCategories = ["Spam", "Harassment", "Violence", "Nudity", "Fake Account", "Copyright", "Other"];
+    const finalCategory = allowedCategories.includes(category) ? category : "Other";
 
     let targetAuthorId: string | null = null;
 
@@ -39,6 +42,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Reel not found" }, { status: 404 });
       }
       targetAuthorId = reel.authorId;
+    } else if (commentId) {
+      // Find the comment to get the authorId
+      const comment = await prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { authorId: true },
+      });
+      if (!comment) {
+        return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+      }
+      targetAuthorId = comment.authorId;
     }
 
     // Create the report
@@ -48,7 +61,9 @@ export async function POST(request: Request) {
         reportedId: targetAuthorId,
         postId: postId || null,
         reelId: reelId || null,
-        reason: reason.trim(),
+        commentId: commentId || null,
+        category: finalCategory,
+        reason: reason?.trim() || `Flagged as ${finalCategory}`,
         status: "PENDING",
       },
     });

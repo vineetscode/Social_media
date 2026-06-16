@@ -3,7 +3,38 @@ import prisma from "@/lib/prisma";
 export class ExploreService {
   // Fetch global trending posts ranked by gravity engagement score
   static async getGlobalTrendingFeed(userId: string, limit = 20) {
+    // Fetch block boundaries and followed users in parallel
+    const [blocks, followers] = await Promise.all([
+      prisma.block.findMany({
+        where: {
+          OR: [
+            { blockerId: userId },
+            { blockedId: userId }
+          ]
+        },
+        select: { blockerId: true, blockedId: true }
+      }),
+      prisma.follower.findMany({
+        where: { followerId: userId },
+        select: { followingId: true }
+      })
+    ]);
+
+    const blockedUserIds = Array.from(new Set(
+      blocks.flatMap(b => [b.blockerId, b.blockedId])
+    )).filter(id => id !== userId);
+
+    const followingIds = followers.map(f => f.followingId);
+
     const posts = await prisma.post.findMany({
+      where: {
+        authorId: { notIn: blockedUserIds },
+        OR: [
+          { authorId: userId },
+          { authorId: { in: followingIds } },
+          { author: { profile: { isPrivate: false } } }
+        ]
+      },
       take: 100, // Fetch top 100 candidate posts for ranking
       orderBy: { createdAt: "desc" },
       include: {
@@ -68,9 +99,39 @@ export class ExploreService {
       .slice(0, limit);
   }
 
-  // Fetch top creators ordered by follower count
-  static async getPopularCreators(limit = 5) {
+  // Fetch top creators ordered by follower count (excluding self, followed users, and blocked users)
+  static async getPopularCreators(userId?: string, limit = 5) {
+    let excludeUserIds: string[] = [];
+
+    if (userId) {
+      excludeUserIds.push(userId);
+
+      // Fetch followed users and blocks in parallel to exclude them from suggestions
+      const [followers, blocks] = await Promise.all([
+        prisma.follower.findMany({
+          where: { followerId: userId },
+          select: { followingId: true }
+        }),
+        prisma.block.findMany({
+          where: {
+            OR: [
+              { blockerId: userId },
+              { blockedId: userId }
+            ]
+          },
+          select: { blockerId: true, blockedId: true }
+        })
+      ]);
+
+      excludeUserIds.push(...followers.map(f => f.followingId));
+      excludeUserIds.push(...blocks.flatMap(b => [b.blockerId, b.blockedId]));
+    }
+
+    // De-duplicate exclusions
+    const finalExcludeIds = Array.from(new Set(excludeUserIds));
+
     return prisma.profile.findMany({
+      where: finalExcludeIds.length > 0 ? { userId: { notIn: finalExcludeIds } } : undefined,
       take: limit,
       orderBy: {
         followerCount: "desc",

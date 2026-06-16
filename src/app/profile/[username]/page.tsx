@@ -69,8 +69,8 @@ export default async function ProfilePage({
     notFound();
   }
 
-  // Fetch posts and follow relationship in parallel to reduce sequential database round-trips
-  const [posts, follow] = await Promise.all([
+  // Fetch posts, follow relationship, and block relationship in parallel
+  const [posts, follow, block] = await Promise.all([
     prisma.post.findMany({
       where: { authorId: profile.userId },
       orderBy: { createdAt: "desc" },
@@ -91,9 +91,26 @@ export default async function ProfilePage({
           },
         })
       : Promise.resolve(null),
+    currentUserId !== profile.userId
+      ? prisma.block.findFirst({
+          where: {
+            OR: [
+              { blockerId: currentUserId, blockedId: profile.userId },
+              { blockerId: profile.userId, blockedId: currentUserId }
+            ]
+          }
+        })
+      : Promise.resolve(null),
   ]);
 
   const isFollowing = !!follow;
+  const isBlocked = !!block;
+  const hasBlocked = block ? block.blockerId === currentUserId : false;
+
+  // Enforce privacy and block checks
+  const isSelf = currentUserId === profile.userId;
+  const isLocked = !isSelf && profile.isPrivate && !isFollowing;
+  const hidePosts = isBlocked || isLocked;
 
   // Serialize objects for safely passing down to Client Component
   const serializedProfile = {
@@ -106,31 +123,36 @@ export default async function ProfilePage({
     followerCount: profile.followerCount,
     followingCount: profile.followingCount,
     isVerified: profile.isVerified,
+    isPrivate: profile.isPrivate,
   };
 
-  const serializedPosts = posts.map((post) => ({
-    id: post.id,
-    caption: post.caption || "",
-    createdAt: post.createdAt.toISOString(),
-    media: post.media.map((med) => ({
-      id: med.id,
-      url: med.url,
-      secureUrl: med.secureUrl,
-      type: med.type,
-    })),
-    _count: {
-      likes: post._count.likes,
-      comments: post._count.comments,
-    },
-  }));
+  const serializedPosts = hidePosts
+    ? []
+    : posts.map((post) => ({
+        id: post.id,
+        caption: post.caption || "",
+        createdAt: post.createdAt.toISOString(),
+        media: post.media.map((med) => ({
+          id: med.id,
+          url: med.url,
+          secureUrl: med.secureUrl,
+          type: med.type,
+        })),
+        _count: {
+          likes: post._count.likes,
+          comments: post._count.comments,
+        },
+      }));
 
   return (
     <ProfileClient
       initialProfile={serializedProfile}
       initialPosts={serializedPosts}
       initialIsFollowing={isFollowing}
-      isSelf={currentUserId === profile.userId}
+      isSelf={isSelf}
       targetUsername={targetUsername}
+      isBlocked={isBlocked}
+      hasBlocked={hasBlocked}
     />
   );
 }

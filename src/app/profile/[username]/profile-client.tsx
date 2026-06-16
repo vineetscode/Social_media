@@ -24,6 +24,9 @@ import {
   UserCheck,
   Settings,
   LogOut,
+  Lock,
+  EyeOff,
+  Ban,
 } from "lucide-react";
 
 interface ProfileDetails {
@@ -36,6 +39,7 @@ interface ProfileDetails {
   followerCount: number;
   followingCount: number;
   isVerified: boolean;
+  isPrivate: boolean;
 }
 
 interface PostMedia {
@@ -59,6 +63,8 @@ interface ProfileClientProps {
   initialIsFollowing: boolean;
   isSelf: boolean;
   targetUsername: string;
+  isBlocked?: boolean;
+  hasBlocked?: boolean;
 }
 
 export default function ProfileClient({
@@ -67,6 +73,8 @@ export default function ProfileClient({
   initialIsFollowing,
   isSelf,
   targetUsername,
+  isBlocked = false,
+  hasBlocked = false,
 }: ProfileClientProps) {
   const { signOut } = useClerk();
   const router = useRouter();
@@ -81,6 +89,33 @@ export default function ProfileClient({
   const [profile, setProfile] = useState<ProfileDetails>(initialProfile);
   const [posts, setPosts] = useState<Post[]>(initialPosts);
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
+  const [blockedState, setBlockedState] = useState(isBlocked);
+  const [hasBlockedState, setHasBlockedState] = useState(hasBlocked);
+
+  const handleToggleBlock = async () => {
+    try {
+      const res = await fetchWithRetry("/api/users/block", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetId: profile.userId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBlockedState(data.blocked);
+        setHasBlockedState(data.blocked ? true : false);
+        if (!data.blocked) {
+          // Refresh data to fetch posts
+          router.refresh();
+        } else {
+          setPosts([]);
+          setIsFollowing(false);
+          setProfile(prev => ({ ...prev, followerCount: Math.max(0, prev.followerCount - 1) }));
+        }
+      }
+    } catch (err) {
+      console.error("Block/unblock failed:", err);
+    }
+  };
 
   // Edit Profile States
   const [showEditModal, setShowEditModal] = useState(false);
@@ -265,24 +300,38 @@ export default function ProfileClient({
                     <Edit className="w-3.5 h-3.5" /> Edit Profile
                   </button>
                 ) : (
-                  <button
-                    onClick={handleToggleFollow}
-                    className={`px-5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center ${
-                      isFollowing
-                        ? "bg-white/6 border border-white/10 text-white hover:bg-white/10"
-                        : "bg-primary hover:bg-primary-hover text-white shadow-glow-sm"
-                    }`}
-                  >
-                    {isFollowing ? (
-                      <>
-                        <UserCheck className="w-3.5 h-3.5 text-accent" /> Following
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-3.5 h-3.5" /> Follow
-                      </>
-                    )}
-                  </button>
+                  <>
+                    <button
+                      onClick={handleToggleFollow}
+                      disabled={blockedState}
+                      className={`px-5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center ${
+                        isFollowing
+                          ? "bg-white/6 border border-white/10 text-white hover:bg-white/10"
+                          : "bg-primary hover:bg-primary-hover text-white shadow-glow-sm disabled:opacity-50"
+                      }`}
+                    >
+                      {isFollowing ? (
+                        <>
+                          <UserCheck className="w-3.5 h-3.5 text-accent" /> Following
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="w-3.5 h-3.5" /> Follow
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleToggleBlock}
+                      className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 w-full sm:w-auto justify-center ${
+                        blockedState && hasBlockedState
+                          ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20"
+                          : "bg-accent-rose/10 border border-accent-rose/20 text-accent-rose hover:bg-accent-rose/20"
+                      }`}
+                    >
+                      <Ban className="w-3.5 h-3.5" />
+                      {blockedState && hasBlockedState ? "Unblock" : "Block"}
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -353,7 +402,65 @@ export default function ProfileClient({
 
         {/* 3. GRID */}
         <AnimatePresence mode="wait">
-          {activeTab === "posts" ? (
+          {blockedState ? (
+            <motion.div
+              key="blocked-placeholder"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="w-full text-center py-16 glass-card rounded-3xl flex flex-col items-center gap-4 text-text-muted"
+            >
+              {hasBlockedState ? (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
+                    <Ban className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-white">You Blocked This User</p>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">
+                      Unblock @{profile.username} to view their posts, reels, and start messaging.
+                    </p>
+                    <button
+                      onClick={handleToggleBlock}
+                      className="mt-4 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-white font-bold text-xs shadow-glow-sm transition-all"
+                    >
+                      Unblock User
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-text-muted">
+                    <EyeOff className="w-8 h-8" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-white">Profile Unavailable</p>
+                    <p className="text-xs text-text-muted max-w-xs mx-auto">
+                      This user has blocked you or you do not have permission to view their profile.
+                    </p>
+                  </div>
+                </>
+              )}
+            </motion.div>
+          ) : !isSelf && profile.isPrivate && !isFollowing ? (
+            <motion.div
+              key="private-placeholder"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="w-full text-center py-16 glass-card rounded-3xl flex flex-col items-center gap-4 text-text-muted"
+            >
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+                <Lock className="w-8 h-8" />
+              </div>
+              <div className="space-y-2">
+                <p className="text-sm font-semibold text-white">This Account is Private</p>
+                <p className="text-xs text-text-muted max-w-xs mx-auto">
+                  Follow @{profile.username} to see their photos, videos, and updates.
+                </p>
+              </div>
+            </motion.div>
+          ) : activeTab === "posts" ? (
             <motion.div
               key="posts-tab"
               initial={{ opacity: 0, y: 15 }}

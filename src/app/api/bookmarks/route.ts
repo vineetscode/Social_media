@@ -1,12 +1,25 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting: max 60 bookmarks per minute
+    const limitCheck = await rateLimiter.rateLimit(`${userId}:bookmarks`, 60000, 60);
+    if (!limitCheck.success) {
+      return NextResponse.json(
+        { error: "Too Many Requests", message: "You are bookmarking posts too fast. Please wait a moment." },
+        {
+          status: 429,
+          headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+        }
+      );
     }
 
     const { postId } = await request.json();

@@ -20,6 +20,29 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Fetch blocks and follow graph in parallel to secure queries
+    const [blocks, followers] = await Promise.all([
+      prisma.block.findMany({
+        where: {
+          OR: [
+            { blockerId: userId },
+            { blockedId: userId }
+          ]
+        },
+        select: { blockerId: true, blockedId: true }
+      }),
+      prisma.follower.findMany({
+        where: { followerId: userId },
+        select: { followingId: true }
+      })
+    ]);
+
+    const blockedUserIds = Array.from(new Set(
+      blocks.flatMap(b => [b.blockerId, b.blockedId])
+    )).filter(id => id !== userId);
+
+    const followingIds = followers.map(f => f.followingId);
+
     // 1. Hashtag Search Mode (if query starts with '#')
     if (query.startsWith("#")) {
       const tag = query.substring(1).trim();
@@ -32,6 +55,12 @@ export async function GET(request: Request) {
               },
             },
           },
+          authorId: { notIn: blockedUserIds },
+          OR: [
+            { authorId: userId },
+            { authorId: { in: followingIds } },
+            { author: { profile: { isPrivate: false } } }
+          ]
         },
         include: {
           author: {
@@ -70,8 +99,8 @@ export async function GET(request: Request) {
 
     // 2. Regular Text Search Mode (Users & Posts)
     const [rawUsers, rawPosts] = await Promise.all([
-      SearchService.searchProfiles(query, 20),
-      SearchService.searchPosts(query, 20),
+      SearchService.searchProfiles(userId, query, 20),
+      SearchService.searchPosts(userId, query, 20),
     ]);
 
     // Map raw sql results to prisma formats if needed, or query fuller objects

@@ -178,17 +178,51 @@ export function generateSignedUploadParams(folder: UploadFolder): {
 
 // ─── VALIDATE FILE ────────────────────────────────────────────────────────────
 export function validateFile(
+  fileName: string,
   mimeType: string,
   sizeBytes: number,
   mediaType: keyof typeof UPLOAD_LIMITS
 ): { valid: boolean; error?: string } {
   const limits = UPLOAD_LIMITS[mediaType];
-  if (!(limits.allowedTypes as readonly string[]).includes(mimeType)) {
-    return { valid: false, error: `Invalid file type. Allowed: ${limits.allowedTypes.join(", ")}` };
+  
+  // 1. Extract and validate file extension
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  if (!ext) {
+    return { valid: false, error: "File extension is missing." };
   }
+
+  // 2. Reject executable and script content (prevent code execution / XSS vectors)
+  const blacklist = [
+    "exe", "js", "html", "htm", "svg", "sh", "bat", "cmd", "com", "scr",
+    "php", "asp", "jsp", "dll", "bin", "msi", "vbs", "wsf", "py", "pl"
+  ];
+  if (blacklist.includes(ext)) {
+    return { valid: false, error: `File type (.${ext}) is restricted. Uploading executables or scripts is prohibited.` };
+  }
+
+  // 3. Whitelist extensions by mediaType category
+  const allowedExtensions: Record<keyof typeof UPLOAD_LIMITS, string[]> = {
+    image: ["jpg", "jpeg", "png", "webp", "gif"],
+    avatar: ["jpg", "jpeg", "png", "webp"],
+    story: ["jpg", "jpeg", "png", "webp", "gif"],
+    video: ["mp4", "webm", "mov"],
+  };
+
+  const allowedExts = allowedExtensions[mediaType];
+  if (!allowedExts || !allowedExts.includes(ext)) {
+    return { valid: false, error: `Invalid file extension .${ext}. Allowed for this category: ${allowedExts?.join(", ")}` };
+  }
+
+  // 4. Validate MIME type
+  if (!(limits.allowedTypes as readonly string[]).includes(mimeType)) {
+    return { valid: false, error: `Invalid MIME type. Allowed: ${limits.allowedTypes.join(", ")}` };
+  }
+
+  // 5. Validate file size limits
   if (sizeBytes > limits.maxBytes) {
     const mb = (limits.maxBytes / 1024 / 1024).toFixed(0);
     return { valid: false, error: `File too large. Maximum size: ${mb} MB` };
   }
+
   return { valid: true };
 }

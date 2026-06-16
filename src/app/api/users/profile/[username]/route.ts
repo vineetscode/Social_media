@@ -36,8 +36,8 @@ export async function GET(
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Fetch posts and check following status in parallel to reduce sequential DB round-trips
-    const [posts, follow] = await Promise.all([
+    // Fetch posts, following status, and block status in parallel
+    const [posts, follow, block] = await Promise.all([
       prisma.post.findMany({
         where: { authorId: profile.userId },
         orderBy: { createdAt: "desc" },
@@ -58,18 +58,36 @@ export async function GET(
             },
           })
         : Promise.resolve(null),
+      currentUserId !== profile.userId
+        ? prisma.block.findFirst({
+            where: {
+              OR: [
+                { blockerId: currentUserId, blockedId: profile.userId },
+                { blockerId: profile.userId, blockedId: currentUserId }
+              ]
+            }
+          })
+        : Promise.resolve(null),
     ]);
 
     const isFollowing = !!follow;
-    queryCount += 2;
+    const isBlocked = !!block;
+    const isSelf = currentUserId === profile.userId;
+    const isLocked = !isSelf && profile.isPrivate && !isFollowing;
+    const hidePosts = isBlocked || isLocked;
+
+    queryCount += 3;
     endQuery = performance.now();
 
     const startSerialization = performance.now();
     const payload = {
       profile,
-      posts,
+      posts: hidePosts ? [] : posts,
       isFollowing,
-      isSelf: currentUserId === profile.userId,
+      isSelf,
+      isBlocked,
+      hasBlocked: block ? block.blockerId === currentUserId : false,
+      locked: isLocked,
     };
     const responseBody = JSON.stringify(payload);
     const endSerialization = performance.now();

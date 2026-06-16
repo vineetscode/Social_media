@@ -5,11 +5,24 @@ import { ReelService } from "@/modules/post/services/reel.service";
 import { NotificationService } from "@/modules/notification/services/notification.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
 import prisma from "@/lib/prisma";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting: max 60 likes per minute
+  const limitCheck = await rateLimiter.rateLimit(`${userId}:likes`, 60000, 60);
+  if (!limitCheck.success) {
+    return NextResponse.json(
+      { error: "Too Many Requests", message: "You are liking posts too fast. Please wait a moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+      }
+    );
   }
 
   // Ensure user profile exists in database

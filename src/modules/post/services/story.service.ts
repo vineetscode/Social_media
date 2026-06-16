@@ -28,10 +28,25 @@ export class StoryService {
     });
   }
 
-  // Get active, unexpired stories from followings plus the user's own stories
+  // Get active, unexpired stories from followings plus the user's own stories (excluding blocked users)
   static async getActiveStoriesForUser(userId: string) {
     const followingIds = await FollowService.getFollowingIds(userId);
-    const candidateIds = [userId, ...followingIds];
+
+    // Fetch block boundaries
+    const blocks = await prisma.block.findMany({
+      where: {
+        OR: [
+          { blockerId: userId },
+          { blockedId: userId }
+        ]
+      },
+      select: { blockerId: true, blockedId: true }
+    });
+    const blockedUserIds = Array.from(new Set(
+      blocks.flatMap(b => [b.blockerId, b.blockedId])
+    )).filter(id => id !== userId);
+
+    const candidateIds = [userId, ...followingIds].filter(id => !blockedUserIds.includes(id));
 
     const now = new Date();
 

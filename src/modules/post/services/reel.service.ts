@@ -50,6 +50,8 @@ export class ReelService {
       },
     };
 
+    const whereObj: any = {};
+
     if (userId) {
       includeObj.likes = {
         where: {
@@ -59,9 +61,44 @@ export class ReelService {
           userId: true,
         },
       };
+
+      // Fetch block boundaries and followed users in parallel
+      const [blocks, followers] = await Promise.all([
+        prisma.block.findMany({
+          where: {
+            OR: [
+              { blockerId: userId },
+              { blockedId: userId }
+            ]
+          },
+          select: { blockerId: true, blockedId: true }
+        }),
+        prisma.follower.findMany({
+          where: { followerId: userId },
+          select: { followingId: true }
+        })
+      ]);
+
+      const blockedUserIds = Array.from(new Set(
+        blocks.flatMap(b => [b.blockerId, b.blockedId])
+      )).filter(id => id !== userId);
+
+      const followingIds = followers.map(f => f.followingId);
+
+      // Exclude blocked users. Only show reels from self, followed users, or public users
+      whereObj.authorId = { notIn: blockedUserIds };
+      whereObj.OR = [
+        { authorId: userId },
+        { authorId: { in: followingIds } },
+        { author: { profile: { isPrivate: false } } }
+      ];
+    } else {
+      // If no userId, only show public creators
+      whereObj.author = { profile: { isPrivate: false } };
     }
 
     return prisma.reel.findMany({
+      where: whereObj,
       take: limit,
       orderBy: { createdAt: "desc" },
       include: includeObj,

@@ -5,6 +5,7 @@ import { PostService } from "@/modules/post/services/post.service";
 import { ReelService } from "@/modules/post/services/reel.service";
 import { NotificationService } from "@/modules/notification/services/notification.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 // GET: Retrieve comments for a Post or Reel
 export async function GET(request: Request) {
@@ -59,6 +60,18 @@ export async function POST(request: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting: max 30 comments per minute
+    const limitCheck = await rateLimiter.rateLimit(`${userId}:comments`, 60000, 30);
+    if (!limitCheck.success) {
+      return NextResponse.json(
+        { error: "Too Many Requests", message: "You are commenting too fast. Please wait before creating more comments." },
+        {
+          status: 429,
+          headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+        }
+      );
     }
 
     // Ensure user profile sync exists

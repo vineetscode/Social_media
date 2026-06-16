@@ -20,6 +20,7 @@ import cloudinary, {
   validateFile,
   type CloudinaryUploadResult,
 } from "@/lib/cloudinary";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 export const runtime = "nodejs"; // Required: Cloudinary uses Node.js streams
 
@@ -28,6 +29,18 @@ export async function POST(request: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limiting: max 5 uploads per minute
+  const limitCheck = await rateLimiter.rateLimit(`${userId}:uploads`, 60000, 5);
+  if (!limitCheck.success) {
+    return NextResponse.json(
+      { error: "Too Many Requests", message: "You are uploading media too fast. Please wait a moment." },
+      {
+        status: 429,
+        headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+      }
+    );
   }
 
   try {
@@ -62,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Validate file ─────────────────────────────────────────────────────────
-    const validation = validateFile(file.type, file.size, mediaType);
+    const validation = validateFile(file.name, file.type, file.size, mediaType);
     if (!validation.valid) {
       return NextResponse.json({ error: validation.error }, { status: 422 });
     }

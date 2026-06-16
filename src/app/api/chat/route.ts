@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { ChatService } from "@/modules/chat/services/chat.service";
 import { syncUserWithDb } from "@/lib/auth-sync";
+import { rateLimiter } from "@/lib/memory-rate-limiter";
 
 // Retrieve direct message logs
 export async function GET(request: Request) {
@@ -76,6 +77,18 @@ export async function POST(request: Request) {
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Rate limiting: max 60 messages per minute
+    const limitCheck = await rateLimiter.rateLimit(`${userId}:chat`, 60000, 60);
+    if (!limitCheck.success) {
+      return NextResponse.json(
+        { error: "Too Many Requests", message: "You are messaging too fast. Please wait a moment." },
+        {
+          status: 429,
+          headers: { "Retry-After": Math.ceil((limitCheck.resetTime - Date.now()) / 1000).toString() }
+        }
+      );
     }
 
     // Ensure user profile exists in database

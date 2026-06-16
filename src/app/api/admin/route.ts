@@ -57,6 +57,18 @@ export async function GET() {
               caption: true,
             },
           },
+          comment: {
+            select: {
+              id: true,
+              content: true,
+            },
+          },
+          reel: {
+            select: {
+              id: true,
+              caption: true,
+            },
+          },
         },
       }),
     ]);
@@ -108,6 +120,16 @@ export async function POST(request: Request) {
         // Delete offending post
         await prisma.post.delete({
           where: { id: report.postId },
+        });
+      } else if (report?.reelId) {
+        // Delete offending reel
+        await prisma.reel.delete({
+          where: { id: report.reelId },
+        });
+      } else if (report?.commentId) {
+        // Delete offending comment
+        await prisma.comment.delete({
+          where: { id: report.commentId },
         });
       }
 

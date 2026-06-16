@@ -21,11 +21,14 @@ import {
 interface Report {
   id: string;
   reason: string;
+  category?: string | null;
   status: "PENDING" | "RESOLVED" | "DISMISSED";
   createdAt: string;
   reporter?: { profile: { username: string; displayName: string } | null } | null;
   reported?: { profile: { username: string; displayName: string } | null } | null;
   post?: { id: string; caption: string } | null;
+  comment?: { id: string; content: string } | null;
+  reel?: { id: string; caption: string } | null;
 }
 interface Metrics { totalUsers: number; totalPosts: number; totalReels: number; totalReports: number; }
 
@@ -178,6 +181,11 @@ export default function AdminPage() {
                           }`}>
                             {report.status}
                           </span>
+                          {report.category && (
+                            <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              {report.category}
+                            </span>
+                          )}
                           <span className="text-[10px] text-text-muted">
                             Filed {new Date(report.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                           </span>
@@ -191,7 +199,17 @@ export default function AdminPage() {
                         </div>
                         {report.post && (
                           <div className="p-3 rounded-xl bg-white/4 border border-white/6 text-xs text-text-secondary italic leading-relaxed">
-                            "{report.post.caption}"
+                            <span className="font-bold text-accent not-italic">Post:</span> "{report.post.caption}"
+                          </div>
+                        )}
+                        {report.reel && (
+                          <div className="p-3 rounded-xl bg-white/4 border border-white/6 text-xs text-text-secondary italic leading-relaxed">
+                            <span className="font-bold text-primary-neon not-italic">Reel:</span> "{report.reel.caption || "No caption"}"
+                          </div>
+                        )}
+                        {report.comment && (
+                          <div className="p-3 rounded-xl bg-white/4 border border-white/6 text-xs text-text-secondary italic leading-relaxed">
+                            <span className="font-bold text-accent-rose not-italic">Comment:</span> "{report.comment.content}"
                           </div>
                         )}
                       </div>

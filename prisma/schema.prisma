@@ -311,6 +311,7 @@ model Report {
   postId     String?
   commentId  String?
   reelId     String?
+  category   String?
   reason     String       @db.Text
   status     ReportStatus @default(PENDING)
   createdAt  DateTime     @default(now())
