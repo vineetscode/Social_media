@@ -61,6 +61,7 @@ USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Standalone output server script built by Next.js
 CMD ["node", "server.js"]
